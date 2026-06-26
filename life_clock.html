@@ -638,7 +638,7 @@ function switchTab(id,btn){
 // BUCKET LIST
 const WK='life_clock_wishes';
 const wLoad=()=>{try{return JSON.parse(localStorage.getItem(WK)||'[]');}catch{return[];}};
-const wSave=l=>localStorage.setItem(WK,JSON.stringify(l));
+const wSave=l=>{localStorage.setItem(WK,JSON.stringify(l)); if(typeof lcSyncScheduleAutoUpload==='function') lcSyncScheduleAutoUpload();};
 const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function render(){
   const l=wLoad(),done=l.filter(w=>w.d).length;
@@ -1069,6 +1069,7 @@ function saveInputs(){
   const data={};
   SIM_INPUTS.forEach(id=>{const el=document.getElementById(id);if(el)data[id]=el.value;});
   localStorage.setItem(SIM_KEY,JSON.stringify(data));
+  if (typeof lcSyncScheduleAutoUpload === 'function') lcSyncScheduleAutoUpload();
   const msg=document.getElementById('saveMsg');
   msg.textContent='✓ 저장됨';msg.style.opacity='1';
   setTimeout(()=>msg.style.opacity='0',2000);
@@ -1083,14 +1084,20 @@ loadInputs();
 runSim();
 
 // ════════════════════════════════════════════════════════════
-// ── GITHUB 동기화 모듈 ──
+// ── GITHUB 동기화 모듈 (자동) ──
 // ════════════════════════════════════════════════════════════
 const LC_SYNC_DATA_KEYS = ['life_clock_wishes','life_sim_v2'];
 const LC_SYNC_CFG_KEY = 'lc_sync_cfg'; // 이 기기에만 저장
 const LC_SYNC_FILE_PATH = 'lifeclock-data.json';
+const LC_SYNC_DEBOUNCE_MS = 2500;
+const LC_SYNC_LAST_KEY = 'lc_sync_last';
+let _lcSyncDebounceTimer = null;
+let _lcSyncInFlight = false;
+let _lcSyncPendingLocalChange = false;
 
 function lcSyncGetCfg(){ try{ return JSON.parse(localStorage.getItem(LC_SYNC_CFG_KEY)||'{}'); }catch(e){ return {}; } }
 function lcSyncSetCfg(cfg){ try{ localStorage.setItem(LC_SYNC_CFG_KEY, JSON.stringify(cfg)); }catch(e){} }
+function lcSyncIsConfigured(){ const c = lcSyncGetCfg(); return !!(c.token && c.owner && c.repo); }
 function lcSyncSetStatus(msg, cls){
   const el = document.getElementById('lc-sync-status');
   if (!el) return;
@@ -1101,8 +1108,7 @@ function lcSyncSetBtnState(state){
   const btn = document.getElementById('lc-sync-btn');
   if (!btn) return;
   btn.classList.remove('syncing','error','configured');
-  const cfg = lcSyncGetCfg();
-  if (cfg.token && cfg.owner && cfg.repo) btn.classList.add('configured');
+  if (lcSyncIsConfigured()) btn.classList.add('configured');
   if (state === 'syncing') btn.classList.add('syncing');
   if (state === 'error') btn.classList.add('error');
 }
@@ -1115,15 +1121,17 @@ function lcOpenSyncModal(){
   document.getElementById('lc-sync-owner').value = cfg.owner || '';
   document.getElementById('lc-sync-repo').value = cfg.repo || '';
   document.getElementById('lc-sync-modal').classList.add('open');
-  lcSyncSetStatus(cfg.token ? '설정이 저장되어 있어요. 업로드/다운로드를 눌러보세요.' : '설정을 입력하면 자동 저장됩니다.');
+  lcSyncSetStatus(cfg.token ? '자동 동기화가 켜져 있어요. 수정하면 잠시 후 자동 업로드돼요.' : '설정을 입력하면 자동 동기화가 시작돼요.');
 }
 function lcCloseSyncModal(){
   const token = document.getElementById('lc-sync-token').value.trim();
   const owner = document.getElementById('lc-sync-owner').value.trim();
   const repo = document.getElementById('lc-sync-repo').value.trim();
+  const wasConfigured = lcSyncIsConfigured();
   if (token || owner || repo) lcSyncSetCfg({token, owner, repo});
   document.getElementById('lc-sync-modal').classList.remove('open');
   lcSyncSetBtnState('idle');
+  if (!wasConfigured && lcSyncIsConfigured()) lcSyncAutoDownloadOnLoad();
 }
 function lcSyncSaveFieldsNow(){
   const token = document.getElementById('lc-sync-token').value.trim();
@@ -1133,11 +1141,16 @@ function lcSyncSaveFieldsNow(){
   return {token, owner, repo};
 }
 
-async function lcSyncUpload(){
-  const {token, owner, repo} = lcSyncSaveFieldsNow();
-  if (!token || !owner || !repo){ lcSyncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad'); return; }
+async function lcSyncDoUpload(silent){
+  const cfg = lcSyncGetCfg();
+  const {token, owner, repo} = cfg;
+  if (!token || !owner || !repo){
+    if (!silent) lcSyncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad');
+    return false;
+  }
+  _lcSyncInFlight = true;
   lcSyncSetBtnState('syncing');
-  lcSyncSetStatus('업로드 중...');
+  if (!silent) lcSyncSetStatus('업로드 중...');
   try{
     const payload = {};
     LC_SYNC_DATA_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v !== null) payload[k] = v; });
@@ -1158,42 +1171,107 @@ async function lcSyncUpload(){
       body: JSON.stringify(putBody)
     });
     if (!putRes.ok){ const errData = await putRes.json().catch(()=>({})); throw new Error(`업로드 실패 (${putRes.status}): ${errData.message||''}`); }
-    lcSyncSetStatus('✓ 업로드 완료! ' + new Date().toLocaleTimeString('ko-KR'), 'ok');
+    localStorage.setItem(LC_SYNC_LAST_KEY, payload._syncedAt);
+    _lcSyncPendingLocalChange = false;
+    if (!silent) lcSyncSetStatus('✓ 업로드 완료! ' + new Date().toLocaleTimeString('ko-KR'), 'ok');
     lcSyncSetBtnState('idle');
+    return true;
   }catch(e){
-    lcSyncSetStatus('✗ ' + e.message, 'bad');
+    if (!silent) lcSyncSetStatus('✗ ' + e.message, 'bad');
     lcSyncSetBtnState('error');
+    return false;
+  } finally {
+    _lcSyncInFlight = false;
   }
 }
 
-async function lcSyncDownload(){
-  const {token, owner, repo} = lcSyncSaveFieldsNow();
-  if (!token || !owner || !repo){ lcSyncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad'); return; }
-  if (!confirm('GitHub의 데이터로 이 기기의 데이터를 덮어씁니다. 계속할까요?')) return;
+async function lcSyncDoDownload(silent){
+  const cfg = lcSyncGetCfg();
+  const {token, owner, repo} = cfg;
+  if (!token || !owner || !repo){
+    if (!silent) lcSyncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad');
+    return false;
+  }
+  _lcSyncInFlight = true;
   lcSyncSetBtnState('syncing');
-  lcSyncSetStatus('다운로드 중...');
+  if (!silent) lcSyncSetStatus('다운로드 중...');
   try{
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${LC_SYNC_FILE_PATH}`;
     const getRes = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' } });
-    if (getRes.status === 404) throw new Error('GitHub에 동기화 파일이 아직 없어요. 먼저 다른 기기에서 업로드해주세요.');
+    if (getRes.status === 404){
+      if (!silent) throw new Error('GitHub에 동기화 파일이 아직 없어요. 먼저 다른 기기에서 업로드해주세요.');
+      return false;
+    }
     if (!getRes.ok){ const errData = await getRes.json().catch(()=>({})); throw new Error(`다운로드 실패 (${getRes.status}): ${errData.message||''}`); }
     const getData = await getRes.json();
     const decoded = lcB64Decode(getData.content.replace(/\n/g, ''));
     const payload = JSON.parse(decoded);
     LC_SYNC_DATA_KEYS.forEach(k => { if (payload[k] !== undefined) localStorage.setItem(k, payload[k]); });
-    lcSyncSetStatus('✓ 다운로드 완료! 새로고침합니다...', 'ok');
+    if (payload._syncedAt) localStorage.setItem(LC_SYNC_LAST_KEY, payload._syncedAt);
     lcSyncSetBtnState('idle');
-    setTimeout(() => location.reload(), 900);
+    return true;
   }catch(e){
-    lcSyncSetStatus('✗ ' + e.message, 'bad');
+    if (!silent) lcSyncSetStatus('✗ ' + e.message, 'bad');
     lcSyncSetBtnState('error');
+    return false;
+  } finally {
+    _lcSyncInFlight = false;
   }
 }
+
+async function lcSyncUpload(){
+  lcSyncSaveFieldsNow();
+  await lcSyncDoUpload(false);
+}
+async function lcSyncDownload(){
+  lcSyncSaveFieldsNow();
+  if (!confirm('GitHub의 데이터로 이 기기의 데이터를 덮어씁니다. 계속할까요?')) return;
+  const ok = await lcSyncDoDownload(false);
+  if (ok){
+    lcSyncSetStatus('✓ 다운로드 완료! 새로고침합니다...', 'ok');
+    setTimeout(() => location.reload(), 900);
+  }
+}
+
+async function lcSyncAutoDownloadOnLoad(){
+  if (!lcSyncIsConfigured()){ lcSyncSetBtnState('idle'); return; }
+  lcSyncSetBtnState('syncing');
+  const ok = await lcSyncDoDownload(true);
+  lcSyncSetBtnState('idle');
+  if (ok){
+    try{
+      loadInputs();
+      runSim();
+      if (typeof render === 'function') render();
+    }catch(e){}
+  }
+}
+
+function lcSyncScheduleAutoUpload(){
+  if (!lcSyncIsConfigured()) return;
+  _lcSyncPendingLocalChange = true;
+  lcSyncSetBtnState('idle');
+  if (_lcSyncDebounceTimer) clearTimeout(_lcSyncDebounceTimer);
+  _lcSyncDebounceTimer = setTimeout(() => {
+    if (_lcSyncInFlight){ lcSyncScheduleAutoUpload(); return; }
+    lcSyncDoUpload(true);
+  }, LC_SYNC_DEBOUNCE_MS);
+}
+
 ['lc-sync-modal'].forEach(id=>{
   const el = document.getElementById(id);
   if (el) el.addEventListener('click', function(e){ if(e.target===this) lcCloseSyncModal(); });
 });
 lcSyncSetBtnState('idle');
+window.addEventListener('beforeunload', function(e){
+  if (_lcSyncPendingLocalChange && lcSyncIsConfigured()){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+// ── 페이지 열릴 때 GitHub에서 최신 데이터 자동 다운로드 ──
+lcSyncAutoDownloadOnLoad();
 </script>
 </body>
 </html>
