@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>나의 인생 시계</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07070f;--sur:#111118;--sur2:#181820;
+  --bdr:rgba(255,255,255,0.07);--bdr2:rgba(255,255,255,0.13);
+  --txt:#eae6df;--mut:#555350;--mut2:#8a8783;
+  --rem:#e2d9c8;--liv:#a07848;--acc:#c4a878;
+  --grn:#6db87c;--red:#c97070;--blu:#7a9ec4;--pur:#a98fd4;
+}
+html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--txt);font-family:'DM Mono',monospace;-webkit-font-smoothing:antialiased}
+.tab-nav{position:sticky;top:0;z-index:100;display:flex;background:rgba(7,7,15,.96);backdrop-filter:blur(12px);border-bottom:.5px solid var(--bdr);padding:0 1.75rem}
+.tn{flex:1;padding:14px 0;background:transparent;border:none;border-bottom:1.5px solid transparent;font-family:'Noto Serif KR',serif;font-size:12px;color:var(--mut2);cursor:pointer;letter-spacing:.1em;transition:all .2s}
+.tn.on{color:var(--acc);border-bottom-color:var(--acc)}
+.tab-pg{display:none}.tab-pg.on{display:block}
+.page{max-width:390px;margin:0 auto;padding:2.5rem 1.75rem 5rem;display:flex;flex-direction:column;gap:2rem}
+
+/* LIFE CLOCK */
+.hdr{text-align:center}
+.eyebrow{font-family:'Noto Serif KR',serif;font-size:10px;letter-spacing:.28em;color:var(--mut2);margin-bottom:.5rem}
+.birthdate{font-family:'Noto Serif KR',serif;font-size:19px;font-weight:300;letter-spacing:.14em}
+.birthtime{font-family:'Noto Serif KR',serif;font-size:13px;font-weight:300;letter-spacing:.12em;color:var(--mut2);margin-top:.35rem}
+.hg-section{display:flex;flex-direction:column;align-items:center}
+.hg-top-label,.hg-bot-label{text-align:center}
+.hg-top-label{margin-bottom:10px}.hg-bot-label{margin-top:10px}
+.hg-top-num{font-size:32px;font-weight:400;letter-spacing:-.03em;color:var(--rem);line-height:1}
+.hg-bot-num{font-size:32px;font-weight:400;letter-spacing:-.03em;color:var(--liv);line-height:1}
+.hg-desc{font-family:'Noto Serif KR',serif;font-size:11px;color:var(--mut2);margin-top:5px;letter-spacing:.06em}
+.hg-sub{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut);margin-top:3px}
+.pct-row{width:100%;display:flex;align-items:center;gap:10px;margin-top:1.5rem}
+.pct-lbl{font-size:11px;white-space:nowrap}
+.pct-track{flex:1;height:1px;background:var(--bdr)}
+.pct-fill{height:100%;background:linear-gradient(90deg,var(--liv),var(--acc));transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+.quote-box{padding:4px 0}
+.quote-line{width:28px;height:.5px;background:var(--acc);opacity:.4;margin-bottom:14px}
+.quote-txt{font-family:'Noto Serif KR',serif;font-size:13px;font-weight:300;color:var(--mut2);line-height:1.9;white-space:pre-line}
+.quote-by{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut);margin-top:10px;letter-spacing:.06em}
+.yr-block{background:var(--sur);border:.5px solid var(--bdr);border-radius:12px;padding:14px 15px}
+.yr-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.yr-title,.yr-val{font-family:'Noto Serif KR',serif;font-size:11px;color:var(--mut2)}
+.yr-bar-track{width:100%;height:1.5px;background:var(--bdr);border-radius:99px;overflow:hidden;margin-bottom:10px}
+.yr-bar-fill{height:100%;background:linear-gradient(90deg,var(--liv),var(--acc));border-radius:99px;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+.yr-dots{display:flex;flex-wrap:wrap;gap:3px}
+.yd{width:5px;height:5px;border-radius:50%;background:var(--bdr)}
+.yd.past{background:var(--acc);opacity:.5}.yd.today{background:var(--rem)}
+.chips{display:flex;flex-direction:column}
+.chip{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:.5px solid var(--bdr)}
+.chip:first-child{border-top:.5px solid var(--bdr)}
+.chip-k{font-family:'Noto Serif KR',serif;font-size:11px;color:var(--mut2)}
+.sec-label{font-family:'Noto Serif KR',serif;font-size:10px;letter-spacing:.22em;color:var(--mut);margin-bottom:16px}
+.wi-row{display:flex;gap:10px;margin-bottom:12px}
+.wi-inp{flex:1;background:transparent;border:none;border-bottom:.5px solid var(--bdr);padding:9px 0;color:var(--txt);font-family:'Noto Serif KR',serif;font-size:13px;outline:none;border-radius:0}
+.wi-inp:focus{border-bottom-color:var(--acc)}.wi-inp::placeholder{color:var(--mut)}
+.wi-btn{background:transparent;border:none;color:var(--acc);font-family:'Noto Serif KR',serif;font-size:13px;cursor:pointer;padding:9px 0 9px 14px}
+.wi-list{display:flex;flex-direction:column}
+.wi{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:.5px solid var(--bdr);transition:opacity .2s}
+.wi.done{opacity:.3}
+.wi-cb{width:13px;height:13px;min-width:13px;margin-top:2px;border:.5px solid var(--mut);border-radius:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--bg);transition:all .15s}
+.wi-cb.on{background:var(--acc);border-color:var(--acc)}
+.wi-txt{flex:1;font-family:'Noto Serif KR',serif;font-size:13px;line-height:1.7;word-break:break-all}
+.wi.done .wi-txt{text-decoration:line-through;color:var(--mut)}
+.wi-del{background:transparent;border:none;color:var(--mut);font-size:15px;cursor:pointer;opacity:.45;padding:0;line-height:1;margin-top:1px}
+.w-empty{font-family:'Noto Serif KR',serif;font-size:12px;color:var(--mut);padding:1.5rem 0;opacity:.55;text-align:center}
+@keyframes sf{0%{transform:translateY(0);opacity:.7}100%{transform:translateY(14px);opacity:0}}
+.sp{animation:sf 1.5s ease-in infinite}
+
+/* SIMULATOR */
+.sim-eye{font-family:'Noto Serif KR',serif;font-size:10px;letter-spacing:.28em;color:var(--mut2);text-align:center;margin-bottom:.4rem}
+.sim-ttl{font-family:'Noto Serif KR',serif;font-size:18px;font-weight:300;text-align:center}
+
+/* 전략 카드 */
+.stg-card{border-radius:14px;border:.5px solid var(--bdr);overflow:hidden;margin-bottom:10px}
+.stg-hdr{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:.5px solid var(--bdr)}
+.stg-num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+.stg-name{font-family:'Noto Serif KR',serif;font-size:13px;font-weight:600}
+.stg-desc{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut2);margin-left:auto;text-align:right;line-height:1.5}
+.stg-body{padding:13px 15px;background:var(--sur);display:flex;flex-direction:column;gap:10px}
+.inp-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.inp-row.w1{grid-template-columns:1fr}
+/* 수정된 코드: 입력 박스 내부 정렬 (입력칸을 항상 맨 아래로 맞춤) */
+.inp-box {
+  background: var(--sur2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  border: .5px solid var(--bdr);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* 이 속성이 숫자 입력칸을 바닥으로 딱 맞춰줍니다 */
+}
+.inp-lbl{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut2);margin-bottom:6px;line-height:1.4}
+.inp-lbl .hint{display:block;font-size:9px;color:var(--mut);margin-top:1px}
+.inp-wrap{display:flex;align-items:baseline;gap:4px}
+.inp-num{background:transparent;border:none;border-bottom:.5px solid var(--bdr);color:var(--txt);font-family:'DM Mono',monospace;font-size:15px;outline:none;width:100%;padding:2px 0;-webkit-appearance:none}
+.inp-num:focus{border-bottom-color:var(--acc)}
+.inp-unit{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut2);white-space:nowrap}
+.auto-badge{background:rgba(109,184,124,.12);border:.5px solid rgba(109,184,124,.3);border-radius:4px;font-family:'Noto Serif KR',serif;font-size:9px;color:var(--grn);padding:2px 6px;white-space:nowrap}
+.fix-badge{background:rgba(196,168,120,.1);border:.5px solid rgba(196,168,120,.25);border-radius:4px;font-family:'Noto Serif KR',serif;font-size:9px;color:var(--acc);padding:2px 6px;white-space:nowrap}
+
+/* 공통 생활 섹션 */
+.life-card{background:var(--sur);border:.5px solid var(--bdr);border-radius:12px;padding:14px 15px}
+.life-ttl{font-family:'Noto Serif KR',serif;font-size:10px;letter-spacing:.15em;color:var(--mut);margin-bottom:12px}
+
+/* 결과 */
+.divider{height:.5px;background:var(--bdr)}
+.res-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.res-card{background:var(--sur);border:.5px solid var(--bdr);border-radius:10px;padding:13px}
+.res-val{font-size:20px;font-weight:400;letter-spacing:-.02em;line-height:1}
+.res-lbl{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut2);margin-top:5px;line-height:1.5}
+.res-card.full{grid-column:1/-1}
+.cf-block{background:var(--sur);border:.5px solid var(--bdr);border-radius:12px;padding:14px}
+.cf-ttl{font-family:'Noto Serif KR',serif;font-size:10px;letter-spacing:.15em;color:var(--mut);margin-bottom:12px}
+.cf-row{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:.5px solid var(--bdr);gap:8px}
+.cf-row:last-child{border:none}
+.cf-k{font-family:'Noto Serif KR',serif;font-size:11px;color:var(--mut2);line-height:1.5;flex:1}
+.cf-v{font-size:12px;white-space:nowrap}
+.cf-total{display:flex;justify-content:space-between;align-items:baseline;border-top:.5px solid var(--bdr2);padding-top:12px;margin-top:2px}
+.cf-total-k{font-family:'Noto Serif KR',serif;font-size:12px}
+.cf-total-v{font-size:22px;font-weight:400}
+.ins-block{background:var(--sur);border:.5px solid var(--bdr);border-radius:12px;padding:14px}
+.ins-ttl{font-family:'Noto Serif KR',serif;font-size:10px;letter-spacing:.15em;color:var(--mut);margin-bottom:12px}
+.ins-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:.5px solid var(--bdr)}
+.ins-row:last-child{border:none}
+.ins-k{font-family:'Noto Serif KR',serif;font-size:11px;color:var(--mut2)}
+.ins-v{font-size:12px}
+.ins-total{display:flex;justify-content:space-between;align-items:baseline;border-top:.5px solid var(--bdr2);padding-top:12px;margin-top:2px}
+.ins-total-k{font-family:'Noto Serif KR',serif;font-size:12px}
+.ins-total-v{font-size:20px;font-weight:400;color:var(--acc)}
+.ins-note{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut);margin-top:10px;line-height:1.8;opacity:.6;white-space:pre-line}
+.warn-box{background:rgba(201,112,112,.08);border:.5px solid rgba(201,112,112,.25);border-radius:10px;padding:12px 14px;font-family:'Noto Serif KR',serif;font-size:11px;color:#e09090;line-height:1.7}
+.ok-box{background:rgba(109,184,124,.08);border:.5px solid rgba(109,184,124,.25);border-radius:10px;padding:12px 14px;font-family:'Noto Serif KR',serif;font-size:11px;color:#90c898;line-height:1.7}
+.chart-box{background:var(--sur);border:.5px solid var(--bdr);border-radius:12px;padding:14px 14px 10px}
+.chart-ttl{font-family:'Noto Serif KR',serif;font-size:11px;color:var(--mut2);margin-bottom:12px}
+canvas{width:100%;display:block}
+
+/* TOTAL ASSET BOX */
+.total-asset-box{background:linear-gradient(135deg,rgba(196,168,120,.1),rgba(196,168,120,.04));border:.5px solid rgba(196,168,120,.3);border-radius:14px;padding:18px 18px 14px;text-align:center}
+.ta-label{font-family:'Noto Serif KR',serif;font-size:10px;letter-spacing:.2em;color:var(--mut2);margin-bottom:8px}
+.ta-value{font-size:28px;font-weight:400;letter-spacing:-.02em;color:var(--acc);margin-bottom:8px}
+.ta-breakdown{font-family:'Noto Serif KR',serif;font-size:11px;color:var(--mut2)}
+
+/* STRATEGY CARD */
+.stg-card{border-radius:12px;border:.5px solid var(--bdr);overflow:hidden;margin-bottom:10px;background:var(--bg)}
+.stg-hdr{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:.5px solid var(--bdr)}
+.stg-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
+.stg-name{font-family:'Noto Serif KR',serif;font-size:13px;font-weight:600;line-height:1}
+.stg-sub{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut2);margin-top:2px}
+.stg-body{padding:12px 14px;background:var(--sur);display:flex;flex-direction:column;gap:9px}
+
+/* INP COMPONENTS */
+.inp-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* 수정된 코드: 입력 박스 내부 정렬 (입력칸을 항상 맨 아래로 맞춤) */
+.inp-box {
+  background: var(--sur2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  border: .5px solid var(--bdr);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* 이 속성이 숫자 입력칸을 바닥으로 딱 맞춰줍니다 */
+}
+.inp-lbl{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut2);margin-bottom:6px;line-height:1.4}
+.inp-lbl .hint{display:block;font-size:9px;color:var(--mut);margin-top:1px}
+.inp-wrap{display:flex;align-items:baseline;gap:4px}
+.inp-num{background:transparent;border:none;border-bottom:.5px solid var(--bdr);color:var(--txt);font-family:'DM Mono',monospace;font-size:15px;outline:none;width:100%;padding:2px 0;-webkit-appearance:none}
+.inp-num:focus{border-bottom-color:var(--acc)}
+.inp-unit{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut2);white-space:nowrap}
+/* 수정된 코드: 모바일 최적화 (위아래 2줄 배치) */
+.auto-row {
+  background: rgba(196, 168, 120, .06);
+  border: .5px solid rgba(196, 168, 120, .15);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column; /* 가로 배치를 세로 배치로 강제 변경 */
+  justify-content: center;
+  gap: 6px; /* 위아래 텍스트 사이의 간격 */
+}
+
+.auto-k {
+  font-family: 'Noto Serif KR', serif;
+  font-size: 11px;
+  color: var(--mut2);
+  width: 100%; /* 제목이 윗줄 전체를 쓰도록 설정 */
+  text-align: left;
+}
+
+.auto-v {
+  font-size: 14px;
+  font-weight: 400;
+  width: 100%; /* 결괏값이 아랫줄 전체를 쓰도록 설정 */
+  text-align: right; /* 우측 정렬 유지 */
+  word-break: keep-all; /* 단어 중간에 끊어지는 현상 완벽 방지 */
+  line-height: 1.4;
+}
+
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ytbl{width:100%;border-collapse:collapse;font-size:11px;font-family:'DM Mono',monospace}
+.ytbl th{font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut2);padding:6px 8px;border-bottom:.5px solid var(--bdr2);text-align:right;white-space:nowrap}
+.ytbl th:first-child{text-align:left}
+.ytbl td{padding:7px 8px;border-bottom:.5px solid var(--bdr);text-align:right;white-space:nowrap}
+.ytbl td:first-child{text-align:left;color:var(--mut2);font-family:'Noto Serif KR',serif}
+.ytbl tr.isa-row{background:rgba(109,184,124,.05)}
+.ytbl tr:last-child td{border-bottom:none}
+
+.ratio-card{background:var(--sur2);border:.5px solid var(--bdr);border-radius:8px;padding:10px 12px}
+.ratio-hdr{font-family:'Noto Serif KR',serif;font-size:11px;font-weight:600;letter-spacing:.05em}
+
+/* ── SYNC ── */
+.sync-tn{
+  flex:0 0 auto; display:flex; align-items:center; gap:5px;
+  padding:14px 12px; background:transparent; border:none; cursor:pointer;
+  font-family:'DM Mono',monospace; font-size:10px; color:var(--mut2);
+  letter-spacing:.08em; transition:color .2s;
+}
+.sync-tn:hover{color:var(--acc)}
+.sync-tn .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--mut);transition:background .2s}
+.sync-tn.configured .sync-dot{background:var(--grn)}
+.sync-tn.syncing .sync-dot{animation:sync-pulse-lc .8s ease-in-out infinite;background:#d4b96a}
+.sync-tn.error .sync-dot{background:var(--red)}
+@keyframes sync-pulse-lc{0%,100%{opacity:1}50%{opacity:.3}}
+.sync-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;backdrop-filter:blur(6px);align-items:center;justify-content:center}
+.sync-modal-overlay.open{display:flex}
+.sync-modal-box{background:var(--sur);border:.5px solid var(--bdr2);border-radius:14px;padding:1.5rem;width:min(360px,calc(100vw - 32px));box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.sync-modal-box h3{font-family:'Noto Serif KR',serif;font-size:14px;font-weight:400;margin-bottom:14px;color:var(--txt)}
+.sync-field-label-lc{font-size:10px;color:var(--mut2);letter-spacing:.05em;margin:12px 0 6px;display:block}
+.sync-field-label-lc:first-child{margin-top:0}
+.sync-input-lc{width:100%;background:var(--sur2);border:.5px solid var(--bdr2);border-radius:7px;padding:9px 10px;color:var(--txt);font-size:12px;font-family:'DM Mono',monospace;outline:none}
+.sync-input-lc:focus{border-color:var(--acc)}
+.sync-actions-row-lc{display:flex;gap:8px;margin-top:14px}
+.btn-sync-lc{flex:1;padding:9px;background:var(--sur2);border:.5px solid var(--bdr2);border-radius:7px;color:var(--txt);cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;transition:border-color .2s}
+.btn-sync-lc:hover{border-color:var(--acc)}
+.sync-status-lc{font-size:11px;color:var(--mut2);margin-top:10px;padding-top:10px;border-top:.5px solid var(--bdr);line-height:1.5;min-height:14px}
+.sync-status-lc.ok{color:var(--grn)}
+.sync-status-lc.bad{color:var(--red)}
+.sync-close-lc{margin-top:12px;text-align:right;font-size:11px;color:var(--mut2);cursor:pointer}
+.sync-close-lc:hover{color:var(--txt)}
+</style>
+</head>
+<body>
+
+<nav class="tab-nav">
+  <button class="tn on" onclick="switchTab('clock',this)">인생 시계</button>
+  <button class="tn" onclick="switchTab('retire',this)">은퇴 계획</button>
+  <button class="sync-tn" id="lc-sync-btn" onclick="lcOpenSyncModal()" title="기기 간 동기화"><span class="sync-dot" id="lc-sync-dot"></span>SYNC</button>
+</nav>
+
+<div class="sync-modal-overlay" id="lc-sync-modal">
+  <div class="sync-modal-box">
+    <h3>☁️ 기기 간 동기화 (GitHub)</h3>
+    <span class="sync-field-label-lc">GitHub Personal Access Token</span>
+    <input type="password" id="lc-sync-token" class="sync-input-lc" placeholder="github_pat_...">
+    <span class="sync-field-label-lc">레포 소유자 (사용자명)</span>
+    <input type="text" id="lc-sync-owner" class="sync-input-lc" placeholder="예: yangjinbum">
+    <span class="sync-field-label-lc">레포 이름</span>
+    <input type="text" id="lc-sync-repo" class="sync-input-lc" placeholder="예: secret">
+    <div class="sync-actions-row-lc">
+      <button class="btn-sync-lc" onclick="lcSyncUpload()">⬆ 업로드</button>
+      <button class="btn-sync-lc" onclick="lcSyncDownload()">⬇ 다운로드</button>
+    </div>
+    <div class="sync-status-lc" id="lc-sync-status">설정을 입력하면 자동 저장됩니다.</div>
+    <div class="sync-close-lc" onclick="lcCloseSyncModal()">닫기</div>
+  </div>
+</div>
+
+<div id="tab-clock" class="tab-pg on">
+<div class="page">
+  <div class="hdr">
+    <p class="eyebrow">MY LIFE CLOCK</p>
+    <h1 class="birthdate">1994 · 02 · 26</h1>
+    <p class="birthtime">09 : 41 AM</p>
+  </div>
+  <div class="hg-section">
+    <div class="hg-top-label">
+      <div class="hg-top-num" id="remN"></div>
+      <div class="hg-desc">남은 날</div>
+      <div class="hg-sub" id="remS"></div>
+    </div>
+    <svg width="130" height="200" viewBox="0 0 100 180">
+      <defs>
+        <clipPath id="uc"><polygon points="6,8 94,8 52,84 48,84"/></clipPath>
+        <clipPath id="lc"><polygon points="48,96 52,96 94,172 6,172"/></clipPath>
+        <linearGradient id="sR" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e2d9c8" stop-opacity=".55"/><stop offset="100%" stop-color="#c4a878" stop-opacity=".2"/></linearGradient>
+        <linearGradient id="sL" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#a07848" stop-opacity=".8"/><stop offset="100%" stop-color="#c4a878" stop-opacity=".3"/></linearGradient>
+      </defs>
+      <rect id="usand" x="0" y="8" width="100" height="0" clip-path="url(#uc)" fill="url(#sR)"/>
+      <rect id="lsand" x="0" y="172" width="100" height="0" clip-path="url(#lc)" fill="url(#sL)"/>
+      <polygon points="6,8 94,8 52,84 48,84" fill="none" stroke="rgba(196,168,120,.3)" stroke-width=".8"/>
+      <polygon points="48,96 52,96 94,172 6,172" fill="none" stroke="rgba(196,168,120,.3)" stroke-width=".8"/>
+      <line x1="48" y1="84" x2="48" y2="96" stroke="rgba(196,168,120,.3)" stroke-width=".8"/>
+      <line x1="52" y1="84" x2="52" y2="96" stroke="rgba(196,168,120,.3)" stroke-width=".8"/>
+      <line x1="2" y1="3" x2="98" y2="3" stroke="#c4a878" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+      <line x1="2" y1="177" x2="98" y2="177" stroke="#c4a878" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+      <text id="uvP" x="50" y="46" font-family="'DM Mono',monospace" font-size="11" fill="#e2d9c8" text-anchor="middle" opacity=".6"></text>
+      <text id="lvP" x="50" y="152" font-family="'DM Mono',monospace" font-size="11" fill="#a07848" text-anchor="middle" opacity=".6"></text>
+      <circle class="sp" cx="50" cy="86" r="1.2" fill="#c4a878" style="animation-delay:0s"/>
+      <circle class="sp" cx="50" cy="86" r="1.0" fill="#c4a878" style="animation-delay:.35s"/>
+      <circle class="sp" cx="50" cy="86" r="1.3" fill="#c4a878" style="animation-delay:.70s"/>
+      <circle class="sp" cx="50" cy="86" r="1.0" fill="#c4a878" style="animation-delay:1.05s"/>
+      <circle class="sp" cx="50" cy="86" r="1.2" fill="#c4a878" style="animation-delay:1.40s"/>
+    </svg>
+    <div class="hg-bot-label">
+      <div class="hg-bot-num" id="livN"></div>
+      <div class="hg-desc">소비한 날</div>
+      <div class="hg-sub" id="livS"></div>
+    </div>
+    <div class="pct-row">
+      <span class="pct-lbl" style="color:var(--liv)" id="pctL"></span>
+      <div class="pct-track"><div class="pct-fill" id="barF" style="width:0%"></div></div>
+      <span class="pct-lbl" style="color:var(--mut2)" id="pctR"></span>
+    </div>
+  </div>
+  <div class="quote-box">
+    <div class="quote-line"></div>
+    <div class="quote-txt" id="qTxt"></div>
+    <div class="quote-by" id="qBy"></div>
+  </div>
+  <div class="yr-block">
+    <div class="yr-top"><span class="yr-title" id="yrT"></span><span class="yr-val" id="yrV"></span></div>
+    <div class="yr-bar-track"><div class="yr-bar-fill" id="yrB" style="width:0%"></div></div>
+    <div class="yr-dots" id="yrD"></div>
+  </div>
+  <div class="chips">
+    <div class="chip"><span class="chip-k">오늘</span><span style="font-size:12px;color:var(--mut2)" id="todayV"></span></div>
+  </div>
+  <div>
+    <p class="sec-label">BUCKET LIST <span id="wc" style="color:var(--mut)"></span></p>
+    <div class="wi-row">
+      <input class="wi-inp" id="wi" type="text" placeholder="하고 싶은 것을 적어보세요" maxlength="60"/>
+      <button class="wi-btn" onclick="addW()">추가</button>
+    </div>
+    <div class="wi-list" id="wl"></div>
+  </div>
+</div>
+</div>
+
+<div id="tab-retire" class="tab-pg">
+<div class="page">
+
+  <div>
+    <p class="sim-eye">MY STRATEGY</p>
+    <h2 class="sim-ttl">3단계 절세 시뮬레이터</h2>
+  </div>
+
+  <div class="inp-box" style="max-width:160px">
+    <div class="inp-lbl">FIRE 나이<span class="hint">시뮬레이션 시작 나이</span></div>
+    <div class="inp-wrap"><input class="inp-num sim-inp" id="cur_age" type="number" value="45" min="20" max="80"/><span class="inp-unit">세</span></div>
+  </div>
+
+  <div class="total-asset-box">
+    <div class="ta-label">현재 총 자산</div>
+    <div class="ta-value" id="totalAssetNow">—</div>
+    <div class="ta-breakdown" id="totalAssetBreak"></div>
+  </div>
+
+  <div class="stg-card">
+    <div class="stg-hdr" style="background:rgba(196,168,120,.06)">
+      <div class="stg-num" style="background:rgba(196,168,120,.15);color:var(--acc)">①</div>
+      <div><div class="stg-name" style="color:var(--acc)">일반계좌</div><div class="stg-sub">메인 현금흐름 · 세금 0%</div></div>
+    </div>
+    <div class="stg-body">
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">ETF 원금<span class="hint">현재 평가액</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="g_p" type="number" value="25000"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">연 배당률<span class="hint">세전</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="g_yield" type="number" value="14.4" step=".1"/><span class="inp-unit">%</span></div></div>
+      </div>
+      <div class="auto-row">
+        <span class="auto-k">월 분배금 (자동계산)</span>
+        <span class="auto-v" id="g_dist_display" style="color:var(--acc)">—</span>
+      </div>
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">연 원금 증감률<span class="hint">NAV 변동 예상치</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="g_nav" type="number" value="0" step=".5"/><span class="inp-unit">%</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">금융소득 연 합산액<span class="hint">1,000만원 이하 유지</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="g_fin_inc" type="number" value="800"/><span class="inp-unit">만원</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stg-card">
+    <div class="stg-hdr" style="background:rgba(109,184,124,.06)">
+      <div class="stg-num" style="background:rgba(109,184,124,.15);color:var(--grn)">②</div>
+      <div><div class="stg-name" style="color:var(--grn)">ISA 중개형</div><div class="stg-sub">세금 필터 · 5년 사이클</div></div>
+    </div>
+    <div class="stg-body">
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">현재 잔액</div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cur" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">연 납입액<span class="hint">한도 2,000만원</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_contrib" type="number" value="2000"/><span class="inp-unit">만원</span></div></div>
+      </div>
+      <div style="font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut);letter-spacing:.1em;padding:2px 0">포트폴리오 구성</div>
+      <div class="ratio-card">
+        <div class="ratio-hdr" style="color:var(--acc)">커버드콜 ETF</div>
+        <div class="inp-row" style="margin-top:8px">
+          <div class="inp-box"><div class="inp-lbl">비율</div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cc_pct" type="number" value="70" min="0" max="100"/><span class="inp-unit">%</span></div></div>
+          <div class="inp-box"><div class="inp-lbl">연 배당률</div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cc_yield" type="number" value="14.4" step=".1"/><span class="inp-unit">%</span></div></div>
+        </div>
+      </div>
+      <div class="ratio-card">
+        <div class="ratio-hdr" style="color:var(--grn)">액티브 ETF (성장)</div>
+        <div class="inp-row" style="margin-top:8px">
+          <div class="inp-box"><div class="inp-lbl">비율 <span style="color:var(--mut2)">(자동)</span></div><div class="inp-wrap"><input class="inp-num" id="i_act_pct" type="number" readonly style="color:var(--mut2)"/><span class="inp-unit">%</span></div></div>
+          <div class="inp-box"><div class="inp-lbl">연 예상수익률</div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_act_ret" type="number" value="12" step=".5"/><span class="inp-unit">%</span></div></div>
+        </div>
+      </div>
+      <div class="auto-row">
+        <span class="auto-k">혼합 수익률 (자동계산)</span>
+        <span class="auto-v" id="i_blend_display" style="color:var(--grn)">—</span>
+      </div>
+      <div class="inp-box"><div class="inp-lbl">만기 사이클<span class="hint">3년 또는 5년</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cycle" type="number" value="5" min="3" max="5"/><span class="inp-unit">년</span></div></div>
+      <div class="auto-row" style="background:rgba(109,184,120,.08);border-color:rgba(109,184,120,.25)">
+        <span class="auto-k">만기 후 연금저축 전환 예상액</span>
+        <span class="auto-v" id="i_transfer_display" style="color:var(--grn)">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stg-card">
+    <div class="stg-hdr" style="background:rgba(122,158,196,.06)">
+      <div class="stg-num" style="background:rgba(122,158,196,.15);color:var(--blu)">③</div>
+      <div><div class="stg-name" style="color:var(--blu)">연금저축펀드</div><div class="stg-sub">과세제외 저수지 · 원금인출 세금 0%</div></div>
+    </div>
+    <div class="stg-body">
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">과세제외금액<span class="hint">원금, 인출 시 세금 0%</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_excl" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">수익분 잔액<span class="hint">55세+ 연금수령</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_gain" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+      </div>
+      <div style="font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut);letter-spacing:.1em;padding:2px 0">포트폴리오 구성</div>
+      <div class="ratio-card">
+        <div class="ratio-hdr" style="color:var(--acc)">커버드콜 ETF</div>
+        <div class="inp-row" style="margin-top:8px">
+          <div class="inp-box"><div class="inp-lbl">비율</div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_cc_pct" type="number" value="70" min="0" max="100"/><span class="inp-unit">%</span></div></div>
+          <div class="inp-box"><div class="inp-lbl">연 배당률</div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_cc_yield" type="number" value="14.4" step=".1"/><span class="inp-unit">%</span></div></div>
+        </div>
+      </div>
+      <div class="ratio-card">
+        <div class="ratio-hdr" style="color:var(--pur)">액티브 ETF (성장)</div>
+        <div class="inp-row" style="margin-top:8px">
+          <div class="inp-box"><div class="inp-lbl">비율 <span style="color:var(--mut2)">(자동)</span></div><div class="inp-wrap"><input class="inp-num" id="p_act_pct" type="number" readonly style="color:var(--mut2)"/><span class="inp-unit">%</span></div></div>
+          <div class="inp-box"><div class="inp-lbl">연 예상수익률</div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_act_ret" type="number" value="12" step=".5"/><span class="inp-unit">%</span></div></div>
+        </div>
+      </div>
+      <div class="auto-row">
+        <span class="auto-k">혼합 수익률 (자동계산)</span>
+        <span class="auto-v" id="p_blend_display" style="color:var(--blu)">—</span>
+      </div>
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">연금수령 시작 나이<span class="hint">만 55세 이상</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_age" type="number" value="60"/><span class="inp-unit">세</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">연금소득세율<span class="hint">3.3~5.5%</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_tax" type="number" value="5.5" step=".1"/><span class="inp-unit">%</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stg-card">
+    <div class="stg-hdr" style="background:rgba(169,143,212,.06)">
+      <div class="stg-num" style="background:rgba(169,143,212,.15);color:var(--pur)">+</div>
+      <div><div class="stg-name" style="color:var(--pur)">추가 원금 납입</div><div class="stg-sub">일반계좌 or ISA 추가 매수</div></div>
+    </div>
+    <div class="stg-body">
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">월 추가 납입<span class="hint">일반계좌 재매수</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="extra_m" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">납입 기간</div><div class="inp-wrap"><input class="inp-num sim-inp" id="extra_yrs" type="number" value="10"/><span class="inp-unit">년간</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stg-card">
+    <div class="stg-hdr" style="background:rgba(201,112,112,.06);cursor:pointer" onclick="toggleExp()">
+      <div class="stg-num" style="background:rgba(201,112,112,.15);color:var(--red)">💸</div>
+      <div><div class="stg-name" style="color:var(--red)">생활비 및 물가상승률</div><div class="stg-sub">세부항목 입력 (탭하여 펼치기)</div></div>
+      <span id="expToggleIcon" style="margin-left:auto;color:var(--mut2);font-size:18px;transition:transform .3s">›</span>
+    </div>
+    <div class="stg-body" id="expDetail" style="display:none">
+      <div style="font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut);margin-bottom:8px">항목별로 입력하면 합계가 자동계산됩니다</div>
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">식비</div><div class="inp-wrap"><input class="inp-num sim-inp exp-item" id="exp_food" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">관리비</div><div class="inp-wrap"><input class="inp-num sim-inp exp-item" id="exp_mgmt" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+      </div>
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">대출상환</div><div class="inp-wrap"><input class="inp-num sim-inp exp-item" id="exp_loan" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">통신비</div><div class="inp-wrap"><input class="inp-num sim-inp exp-item" id="exp_tel" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+      </div>
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">교통/유류</div><div class="inp-wrap"><input class="inp-num sim-inp exp-item" id="exp_car" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">여가/여행</div><div class="inp-wrap"><input class="inp-num sim-inp exp-item" id="exp_leisure" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+      </div>
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">의료/보험</div><div class="inp-wrap"><input class="inp-num sim-inp exp-item" id="exp_med" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">기타</div><div class="inp-wrap"><input class="inp-num sim-inp exp-item" id="exp_etc" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+      </div>
+      <div class="auto-row" style="margin-top:4px">
+        <span class="auto-k">세부항목 합계</span>
+        <span class="auto-v" id="expDetailSum" style="color:var(--red)">0만원</span>
+      </div>
+      <div style="font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut);margin-top:4px">세부항목 합계 > 0이면 아래 총 생활비를 자동으로 덮어씁니다</div>
+    </div>
+    <div class="stg-body" style="border-top:.5px solid var(--bdr)">
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">총 생활비 (월)<span class="hint">현재 기준가치</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="exp" type="number" value="300"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">연 물가상승률<span class="hint">매년 생활비 증가분</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="inf_rate" type="number" value="2.5" step="0.1"/><span class="inp-unit">%</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="life-card">
+    <div class="life-ttl">국민연금</div>
+    <div class="inp-row">
+      <div class="inp-box"><div class="inp-lbl">수령액 (월)</div><div class="inp-wrap"><input class="inp-num sim-inp" id="nps" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+      <div class="inp-box"><div class="inp-lbl">수령 시작 나이</div><div class="inp-wrap"><input class="inp-num sim-inp" id="nps_age" type="number" value="65"/><span class="inp-unit">세</span></div></div>
+    </div>
+  </div>
+
+  <div class="life-card">
+    <div class="life-ttl">실물자산 (건보료 계산)</div>
+    <div class="inp-row">
+      <div class="inp-box"><div class="inp-lbl">주택 시세</div><div class="inp-wrap"><input class="inp-num sim-inp" id="house" type="number" value="50000"/><span class="inp-unit">만원</span></div></div>
+      <div class="inp-box"><div class="inp-lbl">차량 시세</div><div class="inp-wrap"><input class="inp-num sim-inp" id="car" type="number" value="3000"/><span class="inp-unit">만원</span></div></div>
+      <div class="inp-box" style="grid-column:1/-1"><div class="inp-lbl">차량 연식</div><div class="inp-wrap"><input class="inp-num sim-inp" id="car_yr" type="number" value="2022"/><span class="inp-unit">년식</span></div></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div style="display:flex;gap:10px;align-items:center">
+    <button onclick="saveInputs()" style="flex:1;padding:12px;background:transparent;border:.5px solid var(--acc);border-radius:10px;color:var(--acc);font-family:'Noto Serif KR',serif;font-size:13px;cursor:pointer">저장하기</button>
+    <span id="saveMsg" style="font-family:'Noto Serif KR',serif;font-size:11px;color:var(--grn);opacity:0;transition:opacity .4s"></span>
+  </div>
+
+  <div class="divider"></div>
+
+  <div style="display:flex;flex-direction:column;gap:1.25rem">
+
+    <div id="insWarn"></div>
+
+    <div class="res-grid" id="summaryCards"></div>
+
+    <div class="cf-block">
+      <div class="cf-ttl">월 현금흐름 상세 (1년차 기준)</div>
+      <div id="cfRows"></div>
+      <div class="cf-total">
+        <span class="cf-total-k">월 순 잉여금</span>
+        <span class="cf-total-v" id="cfSurplus"></span>
+      </div>
+    </div>
+
+    <div class="cf-block" id="expBreakBlock" style="display:none">
+      <div class="cf-ttl">생활비 세부내역</div>
+      <div id="expBreakRows"></div>
+    </div>
+
+    <div class="chart-box">
+      <div class="chart-ttl" id="chartTtl">총 자산 추이 (30년)</div>
+      <canvas id="dLine" height="260"></canvas>
+    </div>
+
+    <div class="cf-block">
+      <div class="cf-ttl">연도별 자산 추이 (물가상승률 복리 적용)</div>
+      <div id="yearTable"></div>
+    </div>
+
+    <div class="ins-block">
+      <div class="ins-ttl">건강보험료 (지역가입자 전환 시)</div>
+      <div class="ins-row"><span class="ins-k">소득 기반</span><span class="ins-v" id="insInc"></span></div>
+      <div class="ins-row"><span class="ins-k">재산 기반</span><span class="ins-v" id="insProp"></span></div>
+      <div class="ins-row"><span class="ins-k">차량 기반</span><span class="ins-v" id="insCar"></span></div>
+      <div class="ins-row" style="border:none"><span class="ins-k">장기요양보험료</span><span class="ins-v" id="insLtc"></span></div>
+      <div class="ins-total"><span class="ins-total-k">월 납부 예상</span><span class="ins-total-v" id="insTot"></span></div>
+      <div class="ins-note" id="insNote"></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+const QUOTES=[
+  {t:"지금 이 순간이 네가 가진 전부다.",by:"— 마르쿠스 아우렐리우스"},{t:"하루를 살아도 그것이 인생이다.\n무의미하게 살지 마라.",by:"— 법정 스님"},
+  {t:"우리에게 주어진 시간은 충분하다.\n단, 잘 쓴다면.",by:"— 세네카"},{t:"오늘 할 수 있는 일을 내일로 미루지 마라.",by:"— 벤자민 프랭클린"},
+  {t:"중요한 것은 얼마나 오래 사느냐가 아니라,\n얼마나 잘 사느냐다.",by:"— 세네카"},{t:"당신의 시간은 한정되어 있다.\n다른 사람의 삶을 사느라 낭비하지 마라.",by:"— 스티브 잡스"},
+  {t:"10년 후, 당신은 지금 도전하지 않은 것을\n더 후회할 것이다.",by:"— 마크 트웨인"},{t:"어제는 역사고, 내일은 미스터리다.\n오늘은 선물이다.",by:"— 작자 미상"},
+  {t:"나중에 하겠다는 말은\n영원히 안 하겠다는 말과 같다.",by:"— 작자 미상"},{t:"삶은 준비가 끝날 때까지 기다려주지 않는다.",by:"— 작자 미상"},
+  {t:"오늘 심은 나무의 그늘 아래\n내일 쉴 수 있다.",by:"— 워런 버핏"},{t:"가장 잃어버리기 쉬운 날은\n바로 오늘이다.",by:"— 라 브뤼예르"},
+  {t:"현재를 즐겨라.\n과거는 지나갔고, 미래는 아직 오지 않았다.",by:"— 호라티우스"},{t:"남은 인생 중 오늘이 가장 젊은 날이다.",by:"— 작자 미상"},
+  {t:"속도가 아니라 방향이 중요하다.",by:"— 작자 미상"},{t:"충분히 살지 않은 사람만이\n죽음을 두려워한다.",by:"— 에피쿠로스"},
+  {t:"열정 없이 위대한 일은\n이루어진 적이 없다.",by:"— 헤겔"},{t:"죽음을 기억하라.\n그래야 삶을 사랑할 수 있다.",by:"— 메멘토 모리"},
+  {t:"강한 사람이 이기는 게 아니라,\n포기하지 않는 사람이 이긴다.",by:"— 작자 미상"},{t:"하루를 버리는 것은\n삶의 일부를 버리는 것이다.",by:"— 세네카"},
+  {t:"멈추지 마라.\n느려도 괜찮다.",by:"— 공자"},{t:"기회는 준비된 자에게만 보인다.",by:"— 파스퇴르"},
+  {t:"삶에서 가장 용감한 행동은\n스스로 생각하는 것이다.",by:"— 코코 샤넬"},{t:"인생은 한 번뿐이다.\n하지만 제대로 산다면, 한 번으로 충분하다.",by:"— 메이 웨스트"},
+  {t:"오늘의 나는 어제의 선택들이 만든 결과다.",by:"— 작자 미상"},{t:"지금 당장 시작하라.\n완벽한 조건은 결코 오지 않는다.",by:"— 나폴레옹 힐"},
+  {t:"잘 산다는 것은\n잘 죽는 법을 배우는 것이다.",by:"— 소크라테스"},{t:"지금 이 고통이\n언젠가 너의 힘이 될 것이다.",by:"— 오비디우스"},
+  {t:"당신이 사랑하는 것을 하라.\n그러면 일생에 단 하루도 일하지 않게 된다.",by:"— 공자"},{t:"매 순간을 마치 마지막인 것처럼 살아라.",by:"— 작자 미상"},
+];
+
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('tab-'+id).classList.add('on');btn.classList.add('on');
+}
+
+// LIFE CLOCK
+(function(){
+  const birth=new Date(1994,1,26),end=new Date(2074,1,26);
+  const today=new Date();today.setHours(0,0,0,0);
+  const toD=ms=>Math.floor(ms/86400000),fmt=n=>n.toLocaleString('ko-KR');
+  const total=toD(end-birth),lived=toD(today-birth),left=Math.max(0,toD(end-today));
+  const pct=Math.min(100,lived/total*100),rem=100-pct;
+  const age=Math.floor(lived/365.25),leftY=Math.floor(left/365.25),leftM=Math.floor((left%365.25)/30.44);
+  const UH=76,uH=rem/100*UH,lH=pct/100*UH;
+  const us=document.getElementById('usand');us.setAttribute('y',(84-uH).toFixed(1));us.setAttribute('height',uH.toFixed(1));
+  const ls=document.getElementById('lsand');ls.setAttribute('y',(172-lH).toFixed(1));ls.setAttribute('height',lH.toFixed(1));
+  document.getElementById('uvP').textContent=rem.toFixed(1)+'%';
+  document.getElementById('lvP').textContent=pct.toFixed(1)+'%';
+  document.getElementById('remN').textContent=fmt(left);
+  document.getElementById('remS').textContent='약 '+leftY+'년 '+leftM+'개월';
+  document.getElementById('livN').textContent=fmt(lived);
+  document.getElementById('livS').textContent='태어난 지 '+fmt(lived)+'일 · '+age+'세';
+  document.getElementById('pctL').textContent=pct.toFixed(1)+'%';
+  document.getElementById('pctR').textContent=rem.toFixed(1)+'%';
+  setTimeout(()=>{document.getElementById('barF').style.width=pct.toFixed(2)+'%';},200);
+  const qi=toD(today-new Date(2024,0,1))%QUOTES.length;
+  document.getElementById('qTxt').textContent=QUOTES[qi].t;
+  document.getElementById('qBy').textContent=QUOTES[qi].by;
+  const ys=new Date(today.getFullYear(),0,1),ye=new Date(today.getFullYear()+1,0,1);
+  const tD=toD(ye-ys),pD=toD(today-ys)+1,rD=tD-pD;
+  document.getElementById('yrT').textContent=today.getFullYear()+'년';
+  document.getElementById('yrV').textContent=pD+'일 지남 · '+rD+'일 남음';
+  setTimeout(()=>{document.getElementById('yrB').style.width=(pD/tD*100).toFixed(2)+'%';},300);
+  const de=document.getElementById('yrD');
+  for(let i=1;i<=tD;i++){const d=document.createElement('div');d.className='yd'+(i<pD?' past':i===pD?' today':'');de.appendChild(d);}
+  const wd=['일','월','화','수','목','금','토'];
+  document.getElementById('todayV').textContent=
+    today.toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\.\s*/g,' · ').replace(/\s·$/,'')+' · '+wd[today.getDay()]+'요일';
+})();
+
+// BUCKET LIST
+const WK='life_clock_wishes';
+const wLoad=()=>{try{return JSON.parse(localStorage.getItem(WK)||'[]');}catch{return[];}};
+const wSave=l=>localStorage.setItem(WK,JSON.stringify(l));
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function render(){
+  const l=wLoad(),done=l.filter(w=>w.d).length;
+  document.getElementById('wc').textContent=l.length?done+'/'+l.length:'';
+  const wl=document.getElementById('wl');
+  if(!l.length){wl.innerHTML='<div class="w-empty">하고 싶은 것들을 적어보세요</div>';return;}
+  wl.innerHTML=l.map((w,i)=>`<div class="wi${w.d?' done':''}"><div class="wi-cb${w.d?' on':''}" onclick="tog(${i})">${w.d?'✓':''}</div><span class="wi-txt">${esc(w.t)}</span><button class="wi-del" onclick="del(${i})">×</button></div>`).join('');
+}
+function addW(){const inp=document.getElementById('wi'),t=inp.value.trim();if(!t)return;const l=wLoad();l.push({t,d:false});wSave(l);inp.value='';render();}
+function tog(i){const l=wLoad();l[i].d=!l[i].d;wSave(l);render();}
+function del(i){const l=wLoad();l.splice(i,1);wSave(l);render();}
+document.getElementById('wi').addEventListener('keydown',e=>{if(e.key==='Enter')addW();});
+render();
+
+// EXPENSE TOGGLE
+let expOpen=false;
+function toggleExp(){
+  expOpen=!expOpen;
+  document.getElementById('expDetail').style.display=expOpen?'flex':'none';
+  document.getElementById('expToggleIcon').style.transform=expOpen?'rotate(90deg)':'';
+}
+
+// HELPERS
+const gv=id=>parseFloat(document.getElementById(id).value)||0;
+const fmtN=n=>Math.round(n).toLocaleString('ko-KR');
+const fmtW=n=>{const a=Math.abs(n),s=n<0?'-':'';if(a>=100000000)return s+parseFloat((a/100000000).toFixed(3))+'억';if(a>=10000)return s+parseFloat((a/10000).toFixed(3))+'억';return s+fmtN(a)+'만';};
+const fmtM=n=>{const a=Math.abs(n),s=n<0?'-':'';if(a>=10000)return s+parseFloat((a/10000).toFixed(3))+'억';return s+fmtN(a)+'만';};
+const fmtWon=v=>Math.round(v*10000).toLocaleString('ko-KR')+'원';
+
+function propSc(t){
+  if(t<=0)return 0;if(t<=450)return 22;if(t<=900)return 44;if(t<=1350)return 66;
+  if(t<=1800)return 88;if(t<=2700)return 110;if(t<=3600)return 132;if(t<=4500)return 154;
+  if(t<=6750)return 176;if(t<=9000)return 198;if(t<=13500)return 220;return 242;
+}
+function calcIns(annInc,house,car,carYr){
+  const incP=Math.max(annInc/12*0.0709,1.978);
+  const propP=propSc(Math.max(0,house*0.42-5000))*208.4/10000;
+  const carAge=new Date().getFullYear()-carYr;
+  const carP=(car>=4000&&carAge<9)?(car<6000?100:137)*208.4/10000:0;
+  const h=incP+propP+carP;
+  return {incP,propP,carP,health:h,ltc:h*0.1295,total:h*(1+0.1295)};
+}
+
+// AUTO CALC
+let simTimer=null;
+document.querySelectorAll('.sim-inp').forEach(el=>el.addEventListener('input',()=>{
+  clearTimeout(simTimer);simTimer=setTimeout(runSim,280);
+}));
+// expense detail auto-sum
+document.querySelectorAll('.exp-item').forEach(el=>el.addEventListener('input',updateExpSum));
+function updateExpSum(){
+  const ids=['exp_food','exp_mgmt','exp_loan','exp_tel','exp_car','exp_leisure','exp_med','exp_etc'];
+  const sum=ids.reduce((s,id)=>s+gv(id),0);
+  document.getElementById('expDetailSum').textContent=fmtN(sum)+'만원';
+  if(sum>0){
+    const expEl=document.getElementById('exp');
+    if(expEl){expEl.value=sum;expEl.dispatchEvent(new Event('input'));}
+  }
+}
+
+function runSim(){
+  const curAge=gv('cur_age')||45;
+  const gP=gv('g_p'), gYield=gv('g_yield')/100, gNav=gv('g_nav')/100, gFinInc=gv('g_fin_inc');
+  const iCur=gv('i_cur'), iContrib=gv('i_contrib');
+  const iCcPct=gv('i_cc_pct')/100, iCcYield=gv('i_cc_yield')/100;
+  const iActRet=gv('i_act_ret')/100;
+  const iActPct=1-iCcPct;
+  const iBlend=iCcPct*iCcYield + iActPct*iActRet;
+  const iRet=iBlend;
+  const isaCycle=gv('i_cycle')||5;
+
+  const pExcl=gv('p_excl'), pGain=gv('p_gain');
+  const pCcPct=gv('p_cc_pct')/100, pCcYield=gv('p_cc_yield')/100;
+  const pActRet=gv('p_act_ret')/100;
+  const pActPct=1-pCcPct;
+  const pBlend=pCcPct*pCcYield + pActPct*pActRet;
+  const pRet=pBlend;
+  const pAge=gv('p_age'), pTax=gv('p_tax')/100;
+  const extraM=gv('extra_m'), extraYrs=gv('extra_yrs');
+  const exp=gv('exp'), infRate=gv('inf_rate')/100, nps=gv('nps'), npsAge=gv('nps_age');
+  const house=gv('house'), car=gv('car'), carYr=gv('car_yr');
+
+  // 비율 자동계산 표시
+  const iActEl=document.getElementById('i_act_pct');if(iActEl)iActEl.value=Math.round(iActPct*100);
+  const pActEl=document.getElementById('p_act_pct');if(pActEl)pActEl.value=Math.round(pActPct*100);
+
+  // 혼합 수익률 표시
+  const iBlendEl=document.getElementById('i_blend_display');
+  if(iBlendEl)iBlendEl.textContent=(iBlend*100).toFixed(1)+'% (커버드콜 '+Math.round(iCcPct*100)+'% + 액티브 '+Math.round(iActPct*100)+'%)';
+  const pBlendEl=document.getElementById('p_blend_display');
+  if(pBlendEl)pBlendEl.textContent=(pBlend*100).toFixed(1)+'% (커버드콜 '+Math.round(pCcPct*100)+'% + 액티브 '+Math.round(pActPct*100)+'%)';
+
+  // ISA 만기 예상 전환액
+  const isaTransferPreview=iCur*(1+iRet)**isaCycle + iContrib*((1+iRet)**isaCycle-1)/iRet*(1+iRet);
+  const iTransEl=document.getElementById('i_transfer_display');
+  if(iTransEl)iTransEl.textContent=fmtW(Math.round(isaTransferPreview))+'원 ('+isaCycle+'년 후)';
+
+  // 월 분배금
+  const gDist=Math.round(gP*gYield/12);
+  const el_g=document.getElementById('g_dist_display');if(el_g)el_g.textContent=fmtN(gDist)+'만원';
+  
+  // 현재 총 자산
+  const totalNow=gP+iCur+pExcl+pGain;
+  document.getElementById('totalAssetNow').textContent=fmtW(totalNow)+'원';
+  document.getElementById('totalAssetBreak').innerHTML=
+    `<span style="color:var(--acc)">일반 ${fmtM(gP)}</span> + <span style="color:var(--grn)">ISA ${fmtM(iCur)}</span> + <span style="color:var(--blu)">연금 ${fmtM(pExcl+pGain)}</span>`;
+
+  // 건보료 (금융소득 기준)
+  const npsNow=curAge>=npsAge?nps:0;
+  const ins=calcIns(gFinInc+npsNow*12, house, car, carYr);
+  const insM=ins.total;
+
+  // 현재 외부 사용가능 현금흐름 (일반계좌 + 연금만)
+  const livingInc=gDist+npsNow;
+  const pWithdrawM=Math.max(0,exp+insM-livingInc);
+  const surplus=livingInc-exp-insM; // 연금저축 인출 전 순수 현금흐름 잉여분
+
+  // 건보료 경고
+  const warnEl=document.getElementById('insWarn');
+  warnEl.innerHTML=gFinInc>1000
+    ?`<div class="warn-box">⚠️ 금융소득 연 ${fmtN(gFinInc)}만원 → 1,000만원 초과<br>건보료 소득분 반영됩니다.</div>`
+    :`<div class="ok-box">✓ 금융소득 연 ${fmtN(gFinInc)}만원 → 1,000만원 이하 유지<br>건보료에 금융소득 미반영</div>`;
+
+  // 요약 카드
+  document.getElementById('summaryCards').innerHTML=`
+    <div class="res-card"><div class="res-val" style="color:var(--acc)">${fmtM(totalNow)}원</div><div class="res-lbl">현재 총 자산</div></div>
+    <div class="res-card"><div class="res-val" style="color:${surplus>=0?'var(--grn)':'var(--red)'}">${surplus>=0?'+':''}${fmtM(Math.round(surplus))}원</div><div class="res-lbl">현금흐름 순 잉여금<br><span style="font-size:9px;color:var(--mut2)">적자 시 연금원금 인출</span></div></div>
+    <div class="res-card"><div class="res-val" style="color:var(--acc);font-size:18px">${fmtN(gDist)}만원</div><div class="res-lbl">일반계좌 월 분배금</div></div>
+    <div class="res-card"><div class="res-val" style="color:var(--mut2);font-size:18px">${fmtM(Math.round(insM*10)/10)}원</div><div class="res-lbl">건보료 (월)</div></div>
+  `;
+
+  // 현금흐름
+  document.getElementById('cfRows').innerHTML=`
+    <div class="cf-row"><span class="cf-k">① 일반계좌 분배금 (세금 0%)</span><span class="cf-v" style="color:var(--acc)">+${fmtM(gDist)}원</span></div>
+    <div class="cf-row"><span class="cf-k">국민연금</span><span class="cf-v">${npsNow>0?'+'+npsNow+'만원':'수령 전'}</span></div>
+    <div class="cf-row"><span class="cf-k">월 생활비 (물가상승 반영)</span><span class="cf-v" style="color:var(--red)">-${fmtM(exp)}원</span></div>
+    <div class="cf-row"><span class="cf-k">건강보험료</span><span class="cf-v" style="color:var(--red)">-${fmtM(Math.round(insM*10)/10)}원</span></div>
+    <div class="cf-row" style="background:rgba(122,158,196,.05);border-radius:6px;padding:8px 10px;margin-top:6px;border:none"><span class="cf-k">③ 연금저축 과세제외금액 인출</span><span class="cf-v" style="color:var(--blu);font-weight:600">${pWithdrawM>0?'+'+fmtM(Math.round(pWithdrawM))+'원':'인출 불필요'}</span></div>
+    <div class="cf-row" style="border:none;opacity:.5;margin-top:2px"><span class="cf-k">※ 연금저축 내부 분배금은 전액 재투자</span><span class="cf-v"></span></div>
+  `;
+  const surplusEl=document.getElementById('cfSurplus');
+  surplusEl.textContent=(surplus>=0?'+':'')+fmtM(Math.round(surplus))+'원 / 월';
+  surplusEl.style.color=surplus>=0?'var(--grn)':'var(--red)';
+
+  // 생활비 세부
+  const expItems=[
+    {id:'exp_food',label:'식비'},{id:'exp_mgmt',label:'관리비'},{id:'exp_loan',label:'대출상환'},
+    {id:'exp_tel',label:'통신비'},{id:'exp_car',label:'교통/유류'},{id:'exp_leisure',label:'여가/여행'},
+    {id:'exp_med',label:'의료/보험'},{id:'exp_etc',label:'기타'},
+  ];
+  const hasDetail=expItems.some(it=>gv(it.id)>0);
+  const breakBlock=document.getElementById('expBreakBlock');
+  breakBlock.style.display=hasDetail?'block':'none';
+  if(hasDetail){
+    document.getElementById('expBreakRows').innerHTML=expItems.filter(it=>gv(it.id)>0)
+      .map(it=>`<div class="cf-row"><span class="cf-k">${it.label}</span><span class="cf-v" style="color:var(--red)">-${fmtN(gv(it.id))}만원</span></div>`).join('');
+  }
+
+  // ===== 연도별 자산 시뮬레이션 =====
+  const years = Math.max(1, 85 - curAge);
+  const rows=[];
+  let aG=gP, aI=iCur, aPE=pExcl, aPG=pGain;
+  let iCyclePrin = iCur; // ISA 사이클별 원금 추적용
+
+  for(let y=1;y<=years;y++){
+    const age=curAge+y;
+    const npsY=age>=npsAge?nps*12:0;
+    const addY=(y<=extraYrs?extraM:0)*12;
+    const insY=insM*12;
+
+    // 물가상승률 반영된 당해 연도 생활비
+    const expY=exp*12*Math.pow(1+infRate, y-1);
+
+    // ── STEP 1: 현금흐름 및 생활비 부족분 산출 ──
+    const gDistY=aG*gYield;
+    const cashIn=gDistY+npsY;
+    const cashOut=expY+insY;
+    const surplusY=cashIn-cashOut;
+
+    let reinvestY=0;
+    let pWdY=0;
+    if(surplusY >= 0){
+      reinvestY = surplusY;
+    } else {
+      pWdY = Math.abs(surplusY);
+    }
+
+    // ── STEP 2: 각 계좌 당해 연도 순수 수익 계산 (자산 이동 전) ──
+    const gEarnY = aG * (gYield + gNav);               // 일반계좌: 배당 + NAV 상승
+    const iEarnY = aI * iRet;                           // ISA: 내부 복리 수익
+    const totalPEarn = (aPE + aPG - pWdY / 2) * pRet;  // 연금저축: 생활비 차감 정밀 반영
+    let totalEarnY = gEarnY + iEarnY + totalPEarn;      // 당해 총 수익 (지표·실제 일치)
+
+    // ── STEP 3: 자산 증감 적용 ──
+    // 일반계좌
+    aG = aG * (1 + gNav) + reinvestY + addY;
+
+    // ISA: 복리 누적 + 납입
+    aI = aI * (1 + iRet) + iContrib;
+    iCyclePrin += iContrib;
+
+    // 연금저축: 수익 누적 → 생활비 인출
+    aPG += totalPEarn;
+    aPE -= pWdY;
+    if(aPE < 0){
+      aPG += aPE; // 원금 고갈 시 수익분에서 충당
+      aPE = 0;
+    }
+
+    // ── STEP 4: ISA 연말 만기 정산 (수익 계산 완료 후 이체 → 중복 복리 원천 차단) ──
+    let isaTransfer = 0;
+    if(y % isaCycle === 0){
+      const iProfit = Math.max(0, aI - iCyclePrin);
+      const taxableProfit = Math.max(0, iProfit - 200);
+      const iTax = taxableProfit * 0.099;
+
+      isaTransfer = aI - iTax;
+      aPE += isaTransfer;   // 내년부터 연금 수익률 적용 (올해는 중복 없음)
+
+      totalEarnY -= iTax;   // 납부 세금을 당해 총 수익에서 차감
+      aI = 0;
+      iCyclePrin = 0;
+    }
+
+    if(age>=pAge){
+      // 연금수령 나이 도달 시: 오직 모자란 돈만 빼 쓰는 로직 유지
+    }
+
+    const total=aG+aI+aPE+aPG;
+    rows.push({
+      y, age, aG:Math.round(aG), aI:Math.round(aI),
+      aPE:Math.round(aPE), aPG:Math.round(aPG), total:Math.round(total),
+      expY:Math.round(expY), surplusY:Math.round(surplusY),
+      isaTransfer:Math.round(isaTransfer),
+      gDistY:Math.round(gDistY),
+      totalEarnY:Math.round(totalEarnY)
+    });
+  }
+
+  const finalTotal=rows[rows.length-1].total;
+  document.getElementById('chartTtl').textContent=`총 자산 추이 (${curAge}세→85세 · ${fmtW(finalTotal)}원)`;
+  drawChart(rows);
+
+  // 연도별 테이블
+  renderTable(rows, isaCycle, curAge, npsAge);
+
+  // 건보료 UI
+  document.getElementById('insInc').textContent=fmtWon(ins.incP);
+  document.getElementById('insProp').textContent=fmtWon(ins.propP);
+  document.getElementById('insCar').textContent=ins.carP>0?fmtWon(ins.carP):'미부과';
+  document.getElementById('insLtc').textContent=fmtWon(ins.ltc);
+  document.getElementById('insTot').textContent=fmtWon(ins.total)+' / 월';
+  const carAge2=new Date().getFullYear()-carYr;
+  let note='※ 금융소득 1,000만원 이하 → 소득분 건보료 미부과\n※ 재산 과표 = 시세×42%−5,000만원\n※ 점수당 208.4원, 장기요양 12.95% (2024년 기준)';
+  if(car>=4000&&carAge2>=9)note+='\n※ 차량 차령 9년↑ → 미부과';
+  else if(car<4000)note+='\n※ 차량가액 4,000만원 미만 → 미부과';
+  document.getElementById('insNote').textContent=note;
+}
+
+function renderTable(rows, isaCycle, curAge, npsAge){
+  const el=document.getElementById('yearTable');
+  if(!el)return;
+  let html=`<div class="tbl-scroll"><table class="ytbl">
+    <thead><tr>
+      <th>나이</th><th>총 수익(당해)</th><th>연 분배금</th><th>생활비(연)</th><th>잉여금(연)</th><th>일반계좌</th><th>ISA</th><th>연금(원금)</th><th>연금(수익)</th><th>총 자산</th><th>비고</th>
+    </tr></thead><tbody>`;
+  
+  rows.forEach(r=>{
+    const isISAYear=r.y%isaCycle===0;
+    const isNPS=r.age===npsAge;
+    const note=[];
+    if(isISAYear)note.push(`ISA→연금 ${fmtM(r.isaTransfer)}`);
+    if(isNPS)note.push('국민연금 개시');
+    if(r.age===gv('p_age'))note.push('연금 개시 연령');
+    const surpColor=r.surplusY>=0?'var(--grn)':'var(--red)';
+    
+    html+=`<tr class="${isISAYear?'isa-row':''}">
+      <td>${r.age}세</td>
+      <td style="color:var(--pur);font-weight:600">+${fmtM(r.totalEarnY)}</td>
+      <td style="color:var(--acc);font-weight:500">${fmtM(r.gDistY)}</td>
+      <td style="color:var(--red)">${fmtM(r.expY)}</td>
+      <td style="color:${surpColor}">${r.surplusY>=0?'+':''}${fmtM(r.surplusY)}</td>
+      <td style="color:var(--acc)">${fmtM(r.aG)}</td>
+      <td style="color:var(--grn)">${fmtM(r.aI)}</td>
+      <td style="color:var(--blu)">${fmtM(r.aPE)}</td>
+      <td style="color:#a98fd4">${fmtM(r.aPG)}</td>
+      <td style="color:var(--txt);font-weight:500">${fmtM(r.total)}</td>
+      <td style="color:var(--grn);font-size:10px">${note.join(' · ')||''}</td>
+    </tr>`;
+  });
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+}
+
+function drawChart(rows){
+  const cv = document.getElementById('dLine');
+  if(!cv) return;
+  const dpr = window.devicePixelRatio || 1;
+  
+  let parentW = cv.parentElement.clientWidth;
+  if (parentW === 0) parentW = Math.min(window.innerWidth, 390) - 56;
+  
+  const W = Math.max(parentW - 28, 200); 
+  const H = 260; 
+  
+  cv.style.width = W + 'px';
+  cv.style.height = H + 'px';
+  cv.width = W * dpr;
+  cv.height = H * dpr;
+  const ctx = cv.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  // 상단 범례 공간을 위한 위쪽 여백 조정
+  const pad = {t: 30, r: 20, b: 30, l: 50}; 
+  const cw = W - pad.l - pad.r;
+  const ch = H - pad.t - pad.b;
+
+  const maxV = Math.max(...rows.map(r => r.total)) * 1.1 || 1;
+  const tx = i => pad.l + (i / (rows.length - 1)) * cw;
+  const ty = v => pad.t + ch - (v / maxV) * ch;
+
+  // Y축 금액 포맷
+  const fmtY = v => {
+    if(v === 0) return '0';
+    if(v >= 10000) return parseFloat((v / 10000).toFixed(1)) + '억';
+    if(v >= 1000) return parseFloat((v / 1000).toFixed(1)) + '천만';
+    return fmtN(v) + '만';
+  };
+
+  // 배경 가로 격자선 및 Y축 레이블
+  ctx.fillStyle = 'rgba(180, 175, 168, 0.8)';
+  ctx.font = '10px "Noto Serif KR", serif';
+  ctx.textBaseline = 'middle';
+
+  [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+    const y = pad.t + ch * f;
+    const val = maxV * (1 - f);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(pad.l + cw, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.textAlign = 'right';
+    ctx.fillText(fmtY(val), pad.l - 8, y);
+  });
+
+  // 💡 선 그리기 헬퍼 함수
+  const drawLine = (color, valueFn) => {
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5; 
+    ctx.lineJoin = 'round';
+    rows.forEach((r, i) => {
+      const y = ty(valueFn(r));
+      if (i === 0) ctx.moveTo(tx(i), y);
+      else ctx.lineTo(tx(i), y);
+    });
+    ctx.stroke();
+  };
+
+  // 1. 연금계좌 추이: 블루 (Legend와 매칭)
+  drawLine('rgba(122, 158, 196, 0.8)', r => r.aPE + r.aPG);
+  // 2. ISA 계좌 추이: 그린 (Legend와 매칭)
+  drawLine('rgba(109, 184, 124, 0.8)', r => r.aI);
+  // 3. 일반계좌 추이: 골드 (Legend와 매칭)
+  // *💡수정: 총 자산이 아닌, 일반계좌 자체의 추이를 계산해서 그림*
+  drawLine('rgba(196, 168, 120, 0.8)', r => r.total - (r.aI + r.aPE + r.aPG));
+
+  // 미니 범례(Legend) 표시 (그래프 좌상단)
+  const legY = pad.t - 15;
+  ctx.font = '9px "Noto Serif KR", serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const legends = [
+    { c: 'rgba(196, 168, 120, 0.8)', t: '일반' },
+    { c: 'rgba(109, 184, 124, 0.8)', t: 'ISA' },
+    { c: 'rgba(122, 158, 196, 0.8)', t: '연금' }
+  ];
+  let lx = pad.l;
+  legends.forEach(lg => {
+    ctx.fillStyle = lg.c;
+    ctx.beginPath(); ctx.arc(lx + 4, legY, 4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(180, 175, 168, 0.8)';
+    ctx.fillText(lg.t, lx + 12, legY);
+    lx += 45;
+  });
+
+  // X축 (나이) 눈금 그리기 (지능형 겹침 방지 적용)
+  ctx.fillStyle = 'rgba(180, 175, 168, 0.8)';
+  ctx.font = '10px "Noto Serif KR", serif';
+  ctx.textBaseline = 'top';
+
+  const drawX = [];
+  rows.forEach((r, i) => {
+    if (i === 0 || i === rows.length - 1) {
+      drawX.push(i);
+    } else if (r.age % 5 === 0) {
+      if (i > 2 && (rows.length - 1 - i) > 2) {
+        drawX.push(i);
+      }
+    }
+  });
+
+  drawX.forEach(i => {
+    let labelX = tx(i);
+    if (i === 0) ctx.textAlign = 'left';
+    else if (i === rows.length - 1) ctx.textAlign = 'right';
+    else ctx.textAlign = 'center';
+
+    ctx.fillText(rows[i].age + '세', labelX, pad.t + ch + 8);
+
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.moveTo(tx(i), pad.t + ch);
+    ctx.lineTo(tx(i), pad.t + ch + 4);
+    ctx.stroke();
+  });
+}
+
+const SIM_INPUTS=['cur_age','g_p','g_yield','g_nav','g_fin_inc','i_cur','i_contrib','i_cc_pct','i_cc_yield','i_act_ret','i_cycle','p_excl','p_gain','p_cc_pct','p_cc_yield','p_act_ret','p_age','p_tax','extra_m','extra_yrs','exp','inf_rate','nps','nps_age','house','car','car_yr','exp_food','exp_mgmt','exp_loan','exp_tel','exp_car','exp_leisure','exp_med','exp_etc'];
+const SIM_KEY='life_sim_v2';
+function saveInputs(){
+  const data={};
+  SIM_INPUTS.forEach(id=>{const el=document.getElementById(id);if(el)data[id]=el.value;});
+  localStorage.setItem(SIM_KEY,JSON.stringify(data));
+  const msg=document.getElementById('saveMsg');
+  msg.textContent='✓ 저장됨';msg.style.opacity='1';
+  setTimeout(()=>msg.style.opacity='0',2000);
+}
+function loadInputs(){
+  try{
+    const data=JSON.parse(localStorage.getItem(SIM_KEY)||'{}');
+    SIM_INPUTS.forEach(id=>{if(data[id]!==undefined){const el=document.getElementById(id);if(el)el.value=data[id];}});
+  }catch(e){}
+}
+loadInputs();
+runSim();
+
+// ════════════════════════════════════════════════════════════
+// ── GITHUB 동기화 모듈 ──
+// ════════════════════════════════════════════════════════════
+const LC_SYNC_DATA_KEYS = ['life_clock_wishes','life_sim_v2'];
+const LC_SYNC_CFG_KEY = 'lc_sync_cfg'; // 이 기기에만 저장
+const LC_SYNC_FILE_PATH = 'lifeclock-data.json';
+
+function lcSyncGetCfg(){ try{ return JSON.parse(localStorage.getItem(LC_SYNC_CFG_KEY)||'{}'); }catch(e){ return {}; } }
+function lcSyncSetCfg(cfg){ try{ localStorage.setItem(LC_SYNC_CFG_KEY, JSON.stringify(cfg)); }catch(e){} }
+function lcSyncSetStatus(msg, cls){
+  const el = document.getElementById('lc-sync-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'sync-status-lc' + (cls ? ' ' + cls : '');
+}
+function lcSyncSetBtnState(state){
+  const btn = document.getElementById('lc-sync-btn');
+  if (!btn) return;
+  btn.classList.remove('syncing','error','configured');
+  const cfg = lcSyncGetCfg();
+  if (cfg.token && cfg.owner && cfg.repo) btn.classList.add('configured');
+  if (state === 'syncing') btn.classList.add('syncing');
+  if (state === 'error') btn.classList.add('error');
+}
+function lcB64Encode(str){ return btoa(unescape(encodeURIComponent(str))); }
+function lcB64Decode(b64){ return decodeURIComponent(escape(atob(b64))); }
+
+function lcOpenSyncModal(){
+  const cfg = lcSyncGetCfg();
+  document.getElementById('lc-sync-token').value = cfg.token || '';
+  document.getElementById('lc-sync-owner').value = cfg.owner || '';
+  document.getElementById('lc-sync-repo').value = cfg.repo || '';
+  document.getElementById('lc-sync-modal').classList.add('open');
+  lcSyncSetStatus(cfg.token ? '설정이 저장되어 있어요. 업로드/다운로드를 눌러보세요.' : '설정을 입력하면 자동 저장됩니다.');
+}
+function lcCloseSyncModal(){
+  const token = document.getElementById('lc-sync-token').value.trim();
+  const owner = document.getElementById('lc-sync-owner').value.trim();
+  const repo = document.getElementById('lc-sync-repo').value.trim();
+  if (token || owner || repo) lcSyncSetCfg({token, owner, repo});
+  document.getElementById('lc-sync-modal').classList.remove('open');
+  lcSyncSetBtnState('idle');
+}
+function lcSyncSaveFieldsNow(){
+  const token = document.getElementById('lc-sync-token').value.trim();
+  const owner = document.getElementById('lc-sync-owner').value.trim();
+  const repo = document.getElementById('lc-sync-repo').value.trim();
+  lcSyncSetCfg({token, owner, repo});
+  return {token, owner, repo};
+}
+
+async function lcSyncUpload(){
+  const {token, owner, repo} = lcSyncSaveFieldsNow();
+  if (!token || !owner || !repo){ lcSyncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad'); return; }
+  lcSyncSetBtnState('syncing');
+  lcSyncSetStatus('업로드 중...');
+  try{
+    const payload = {};
+    LC_SYNC_DATA_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v !== null) payload[k] = v; });
+    payload._syncedAt = new Date().toISOString();
+    const content = lcB64Encode(JSON.stringify(payload, null, 2));
+
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${LC_SYNC_FILE_PATH}`;
+    let sha;
+    const getRes = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' } });
+    if (getRes.status === 200){ const getData = await getRes.json(); sha = getData.sha; }
+    else if (getRes.status !== 404){ const errData = await getRes.json().catch(()=>({})); throw new Error(`조회 실패 (${getRes.status}): ${errData.message||''}`); }
+
+    const putBody = { message: `sync: lifeclock data ${payload._syncedAt}`, content };
+    if (sha) putBody.sha = sha;
+    const putRes = await fetch(apiUrl, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(putBody)
+    });
+    if (!putRes.ok){ const errData = await putRes.json().catch(()=>({})); throw new Error(`업로드 실패 (${putRes.status}): ${errData.message||''}`); }
+    lcSyncSetStatus('✓ 업로드 완료! ' + new Date().toLocaleTimeString('ko-KR'), 'ok');
+    lcSyncSetBtnState('idle');
+  }catch(e){
+    lcSyncSetStatus('✗ ' + e.message, 'bad');
+    lcSyncSetBtnState('error');
+  }
+}
+
+async function lcSyncDownload(){
+  const {token, owner, repo} = lcSyncSaveFieldsNow();
+  if (!token || !owner || !repo){ lcSyncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad'); return; }
+  if (!confirm('GitHub의 데이터로 이 기기의 데이터를 덮어씁니다. 계속할까요?')) return;
+  lcSyncSetBtnState('syncing');
+  lcSyncSetStatus('다운로드 중...');
+  try{
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${LC_SYNC_FILE_PATH}`;
+    const getRes = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' } });
+    if (getRes.status === 404) throw new Error('GitHub에 동기화 파일이 아직 없어요. 먼저 다른 기기에서 업로드해주세요.');
+    if (!getRes.ok){ const errData = await getRes.json().catch(()=>({})); throw new Error(`다운로드 실패 (${getRes.status}): ${errData.message||''}`); }
+    const getData = await getRes.json();
+    const decoded = lcB64Decode(getData.content.replace(/\n/g, ''));
+    const payload = JSON.parse(decoded);
+    LC_SYNC_DATA_KEYS.forEach(k => { if (payload[k] !== undefined) localStorage.setItem(k, payload[k]); });
+    lcSyncSetStatus('✓ 다운로드 완료! 새로고침합니다...', 'ok');
+    lcSyncSetBtnState('idle');
+    setTimeout(() => location.reload(), 900);
+  }catch(e){
+    lcSyncSetStatus('✗ ' + e.message, 'bad');
+    lcSyncSetBtnState('error');
+  }
+}
+['lc-sync-modal'].forEach(id=>{
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', function(e){ if(e.target===this) lcCloseSyncModal(); });
+});
+lcSyncSetBtnState('idle');
+</script>
+</body>
+</html>
