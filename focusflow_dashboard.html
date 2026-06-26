@@ -1356,22 +1356,31 @@ const LS = {
   tasks: 'ff_tasks', goals: 'ff_goals', projects: 'ff_projects',
   habits: 'ff_habits', notes: 'ff_notes', weekTasks: 'ff_week', memo: 'ff_memo'
 };
-function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} }
+function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); syncScheduleAutoUpload(); } catch(e){} }
 function load(key, def) { try { const v=localStorage.getItem(key); return v?JSON.parse(v):def; } catch(e){ return def; } }
 
 // ════════════════════════════════════════════════════════════
-// ── GITHUB 동기화 모듈 ──
+// ── GITHUB 동기화 모듈 (자동) ──
 // 동기화 대상 데이터 키 (실제 콘텐츠 데이터만, 인증정보는 별도 저장)
 // ════════════════════════════════════════════════════════════
 const SYNC_DATA_KEYS = ['ff_tasks','ff_goals','ff_projects','ff_habits','ff_notes','ff_week','ff_memo','ff_manual_location'];
 const SYNC_CFG_KEY = 'ff_sync_cfg'; // {token, owner, repo} — 이 기기에만 저장됨
 const SYNC_FILE_PATH = 'focusflow-data.json';
+const SYNC_DEBOUNCE_MS = 2500; // 마지막 수정 후 이 시간만큼 조작이 없으면 자동 업로드
+const SYNC_LAST_KEY = 'ff_sync_last'; // 마지막 동기화 시각 표시용 (기기별)
+let _syncDebounceTimer = null;
+let _syncInFlight = false;
+let _syncPendingLocalChange = false; // 다운로드보다 먼저 처리해야 할 로컬 변경이 있는지
 
 function syncGetCfg() {
   try { return JSON.parse(localStorage.getItem(SYNC_CFG_KEY) || '{}'); } catch(e) { return {}; }
 }
 function syncSetCfg(cfg) {
   try { localStorage.setItem(SYNC_CFG_KEY, JSON.stringify(cfg)); } catch(e){}
+}
+function syncIsConfigured() {
+  const cfg = syncGetCfg();
+  return !!(cfg.token && cfg.owner && cfg.repo);
 }
 function syncSetStatus(msg, cls) {
   const el = document.getElementById('sync-status');
@@ -1380,14 +1389,28 @@ function syncSetStatus(msg, cls) {
   el.className = 'sync-status-line' + (cls ? ' ' + cls : '');
 }
 function syncSetBtnState(state) {
-  // state: 'idle' | 'syncing' | 'error'
+  // state: 'idle' | 'syncing' | 'error' | 'pending'
   const btn = document.getElementById('sync-btn');
   if (!btn) return;
   btn.classList.remove('syncing','error','configured');
-  const cfg = syncGetCfg();
-  if (cfg.token && cfg.owner && cfg.repo) btn.classList.add('configured');
+  if (syncIsConfigured()) btn.classList.add('configured');
   if (state === 'syncing') btn.classList.add('syncing');
   if (state === 'error') btn.classList.add('error');
+  syncUpdateLabel(state);
+}
+function syncUpdateLabel(state) {
+  const label = document.getElementById('sync-btn-label');
+  if (!label) return;
+  if (state === 'syncing') { label.textContent = '동기화 중'; return; }
+  if (state === 'pending') { label.textContent = '곧 동기화'; return; }
+  if (state === 'error') { label.textContent = '동기화 오류'; return; }
+  const last = localStorage.getItem(SYNC_LAST_KEY);
+  if (last) {
+    const d = new Date(last);
+    label.textContent = d.toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}) + ' 동기화됨';
+  } else {
+    label.textContent = '동기화';
+  }
 }
 // UTF-8 안전 base64 인코딩/디코딩 (한글 포함 JSON 처리)
 function syncB64Encode(str) {
@@ -1402,16 +1425,18 @@ function openSyncModal() {
   document.getElementById('sync-owner').value = cfg.owner || '';
   document.getElementById('sync-repo').value = cfg.repo || '';
   document.getElementById('sync-modal').classList.add('open');
-  syncSetStatus(cfg.token ? '설정이 저장되어 있어요. 업로드/다운로드를 눌러보세요.' : '설정을 입력하면 자동 저장됩니다. 토큰은 이 브라우저에만 저장돼요.');
+  syncSetStatus(cfg.token ? '자동 동기화가 켜져 있어요. 데이터를 수정하면 잠시 후 자동으로 업로드돼요.' : '설정을 입력하면 자동 저장되고, 자동 동기화가 시작돼요. 토큰은 이 브라우저에만 저장돼요.');
 }
 function closeSyncModal() {
-  // 입력값 자동 저장
   const token = document.getElementById('sync-token').value.trim();
   const owner = document.getElementById('sync-owner').value.trim();
   const repo = document.getElementById('sync-repo').value.trim();
+  const wasConfigured = syncIsConfigured();
   if (token || owner || repo) syncSetCfg({token, owner, repo});
   document.getElementById('sync-modal').classList.remove('open');
   syncSetBtnState('idle');
+  // 방금 새로 설정을 입력했다면, 즉시 한 번 다운로드해서 다른 기기 데이터를 받아옴
+  if (!wasConfigured && syncIsConfigured()) syncAutoDownloadOnLoad();
 }
 function syncSaveFieldsNow() {
   const token = document.getElementById('sync-token').value.trim();
@@ -1421,11 +1446,17 @@ function syncSaveFieldsNow() {
   return {token, owner, repo};
 }
 
-async function syncUpload() {
-  const {token, owner, repo} = syncSaveFieldsNow();
-  if (!token || !owner || !repo) { syncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad'); return; }
+// 실제 업로드 수행 (silent=true면 모달 상태 표시를 건너뛰고 버튼만 갱신)
+async function syncDoUpload(silent) {
+  const cfg = syncGetCfg();
+  const {token, owner, repo} = cfg;
+  if (!token || !owner || !repo) {
+    if (!silent) syncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad');
+    return false;
+  }
+  _syncInFlight = true;
   syncSetBtnState('syncing');
-  syncSetStatus('업로드 중...');
+  if (!silent) syncSetStatus('업로드 중...');
   try {
     const payload = {};
     SYNC_DATA_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v !== null) payload[k] = v; });
@@ -1433,7 +1464,6 @@ async function syncUpload() {
     const content = syncB64Encode(JSON.stringify(payload, null, 2));
 
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${SYNC_FILE_PATH}`;
-    // 기존 파일의 sha 조회 (없으면 새로 생성)
     let sha = undefined;
     const getRes = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' } });
     if (getRes.status === 200) {
@@ -1455,24 +1485,37 @@ async function syncUpload() {
       const errData = await putRes.json().catch(()=>({}));
       throw new Error(`업로드 실패 (${putRes.status}): ${errData.message || ''}`);
     }
-    syncSetStatus('✓ 업로드 완료! ' + new Date().toLocaleTimeString('ko-KR'), 'ok');
+    localStorage.setItem(SYNC_LAST_KEY, payload._syncedAt);
+    _syncPendingLocalChange = false;
+    if (!silent) syncSetStatus('✓ 업로드 완료! ' + new Date().toLocaleTimeString('ko-KR'), 'ok');
     syncSetBtnState('idle');
+    return true;
   } catch (e) {
-    syncSetStatus('✗ ' + e.message, 'bad');
+    if (!silent) syncSetStatus('✗ ' + e.message, 'bad');
     syncSetBtnState('error');
+    return false;
+  } finally {
+    _syncInFlight = false;
   }
 }
 
-async function syncDownload() {
-  const {token, owner, repo} = syncSaveFieldsNow();
-  if (!token || !owner || !repo) { syncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad'); return; }
-  if (!confirm('GitHub의 데이터로 이 기기의 데이터를 덮어씁니다. 계속할까요?')) return;
+async function syncDoDownload(silent) {
+  const cfg = syncGetCfg();
+  const {token, owner, repo} = cfg;
+  if (!token || !owner || !repo) {
+    if (!silent) syncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad');
+    return false;
+  }
+  _syncInFlight = true;
   syncSetBtnState('syncing');
-  syncSetStatus('다운로드 중...');
+  if (!silent) syncSetStatus('다운로드 중...');
   try {
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${SYNC_FILE_PATH}`;
     const getRes = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' } });
-    if (getRes.status === 404) throw new Error('GitHub에 동기화 파일이 아직 없어요. 먼저 다른 기기에서 업로드해주세요.');
+    if (getRes.status === 404) {
+      if (!silent) throw new Error('GitHub에 동기화 파일이 아직 없어요. 먼저 다른 기기에서 업로드해주세요.');
+      return false; // silent 자동 다운로드에서는 첫 사용 시 파일 없는 게 정상이라 조용히 무시
+    }
     if (!getRes.ok) {
       const errData = await getRes.json().catch(()=>({}));
       throw new Error(`다운로드 실패 (${getRes.status}): ${errData.message || ''}`);
@@ -1481,19 +1524,83 @@ async function syncDownload() {
     const decoded = syncB64Decode(getData.content.replace(/\n/g, ''));
     const payload = JSON.parse(decoded);
     SYNC_DATA_KEYS.forEach(k => { if (payload[k] !== undefined) localStorage.setItem(k, payload[k]); });
-    syncSetStatus('✓ 다운로드 완료! 새로고침합니다...', 'ok');
+    if (payload._syncedAt) localStorage.setItem(SYNC_LAST_KEY, payload._syncedAt);
     syncSetBtnState('idle');
-    setTimeout(() => location.reload(), 900);
+    return true;
   } catch (e) {
-    syncSetStatus('✗ ' + e.message, 'bad');
+    if (!silent) syncSetStatus('✗ ' + e.message, 'bad');
     syncSetBtnState('error');
+    return false;
+  } finally {
+    _syncInFlight = false;
   }
 }
+
+// 수동 버튼용 래퍼 (모달 안의 버튼은 그대로 유지, 필요하면 강제로 즉시 실행)
+async function syncUpload() {
+  syncSaveFieldsNow();
+  const ok = await syncDoUpload(false);
+  if (ok) syncUpdateLabel('idle');
+}
+async function syncDownload() {
+  syncSaveFieldsNow();
+  if (!confirm('GitHub의 데이터로 이 기기의 데이터를 덮어씁니다. 계속할까요?')) return;
+  const ok = await syncDoDownload(false);
+  if (ok) {
+    syncSetStatus('✓ 다운로드 완료! 새로고침합니다...', 'ok');
+    setTimeout(() => location.reload(), 900);
+  }
+}
+
+// 페이지 로드 시 자동 다운로드 (조용히, 에러 나도 사용 막지 않음)
+async function syncAutoDownloadOnLoad() {
+  if (!syncIsConfigured()) { syncSetBtnState('idle'); return; }
+  syncSetBtnState('syncing');
+  const ok = await syncDoDownload(true);
+  syncSetBtnState('idle');
+  if (ok) renderAllAfterSync();
+}
+// 화면을 다시 그려서 받아온 데이터를 반영 (각 탭 렌더 함수 재호출)
+function renderAllAfterSync() {
+  try {
+    goals = load(LS.goals, goals);
+    projects = load(LS.projects, projects);
+    habits = load(LS.habits, habits);
+    notes = load(LS.notes, notes);
+    weekTasksAll = load(LS.weekTasks, weekTasksAll);
+    memoText = load(LS.memo, memoText);
+    if (typeof renderTasks === 'function') renderTasks();
+    if (typeof renderGoals === 'function') renderGoals();
+    if (typeof renderTab === 'function') renderTab(document.querySelector('.nav-chip.active')?.dataset.tab || 'daily');
+    const memoEl = document.getElementById('memo-display');
+    if (memoEl) memoEl.textContent = memoText;
+  } catch(e) { /* 일부 변수가 아직 초기화 전이면 무시 */ }
+}
+
+// 데이터 변경 시 호출 — 디바운스 후 자동 업로드 (save() 내부에서 호출됨)
+function syncScheduleAutoUpload() {
+  if (!syncIsConfigured()) return;
+  _syncPendingLocalChange = true;
+  syncSetBtnState('pending');
+  if (_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
+  _syncDebounceTimer = setTimeout(() => {
+    if (_syncInFlight) { syncScheduleAutoUpload(); return; } // 진행 중이면 다시 예약
+    syncDoUpload(true);
+  }, SYNC_DEBOUNCE_MS);
+}
+
 ['sync-modal'].forEach(id=>{
   const el = document.getElementById(id);
   if (el) el.addEventListener('click', function(e){ if(e.target===this) closeSyncModal(); });
 });
 syncSetBtnState('idle');
+// 변경사항이 남아있는데 탭을 닫으려 하면 한 번 더 알려줌 (업로드 보장은 못하지만 인지시킴)
+window.addEventListener('beforeunload', function(e){
+  if (_syncPendingLocalChange && syncIsConfigured()) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 
 // ── DATA (localStorage 우선) ──
 // ── 참고: "오늘 할 일"은 더 이상 별도 배열로 관리하지 않고,
@@ -2146,6 +2253,9 @@ document.getElementById('wt-input').addEventListener('keydown', e=>{ if(e.key===
 
 // ── INIT ──
 renderTab('daily');
+
+// ── 자동 동기화: 페이지 열릴 때 GitHub에서 최신 데이터 자동 다운로드 ──
+syncAutoDownloadOnLoad();
 </script>
 </body>
 </html>
