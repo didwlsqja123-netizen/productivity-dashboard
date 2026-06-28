@@ -13,6 +13,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500&family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+input[type=number] { -moz-appearance:textfield; }
 
 :root {
   --bg: #111118;
@@ -1438,10 +1441,13 @@ const LEDGER_DEFAULT_CATEGORIES = {
   ],
   expense: [
     {key:'food', label:'식비', color:'#fb923c'},
+    {key:'cafe', label:'카페', color:'#a16207'},
     {key:'transport', label:'교통', color:'#60a5fa'},
     {key:'housing', label:'주거/통신', color:'#f472b6'},
     {key:'shopping', label:'쇼핑', color:'#a78bfa'},
     {key:'medical', label:'의료', color:'#4ade80'},
+    {key:'culture', label:'문화/여가', color:'#34d399'},
+    {key:'loan', label:'대출', color:'#f87171'},
     {key:'etc', label:'기타', color:'#94a3b8'},
   ]
 };
@@ -1538,6 +1544,40 @@ function downloadCsv(filename, rows) {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+function importFromExcel() {
+  const IMPORT_DATA = [{"id":1782625003611,"date":"2026-04-01","desc":"피복","amount":37900,"type":"expense","category":"shopping","fromRecurring":false},{"id":1782625003612,"date":"2026-04-04","desc":"피복","amount":25000,"type":"expense","category":"shopping","fromRecurring":false},{"id":1782625003613,"date":"2026-04-04","desc":"경조사","amount":28400,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003614,"date":"2026-04-04","desc":"경조사","amount":20300,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003615,"date":"2026-04-05","desc":"경조사","amount":4000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003616,"date":"2026-04-05","desc":"컬리","amount":1900,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003617,"date":"2026-04-06","desc":"피복","amount":8930,"type":"expense","category":"shopping","fromRecurring":false},{"id":1782625003618,"date":"2026-04-06","desc":"피복","amount":12800,"type":"expense","category":"shopping","fromRecurring":false},{"id":1782625003619,"date":"2026-04-07","desc":"경조사","amount":7900,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003620,"date":"2026-04-08","desc":"교양_오락","amount":6500,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003621,"date":"2026-04-11","desc":"교양_오락","amount":17000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003622,"date":"2026-04-11","desc":"교양_오락","amount":7950,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003623,"date":"2026-04-13","desc":"경조사","amount":9625,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003624,"date":"2026-04-13","desc":"교양_오락","amount":21800,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003625,"date":"2026-04-15","desc":"컬리","amount":16300,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003626,"date":"2026-04-16","desc":"교양_오락","amount":10000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003627,"date":"2026-04-16","desc":"피복","amount":35000,"type":"expense","category":"shopping","fromRecurring":false},{"id":1782625003628,"date":"2026-04-18","desc":"경조사","amount":20000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003629,"date":"2026-04-19","desc":"경조사","amount":30000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003630,"date":"2026-04-19","desc":"경조사","amount":200000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003631,"date":"2026-04-21","desc":"부모님","amount":147500,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003632,"date":"2026-04-24","desc":"교양_오락","amount":19700,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003633,"date":"2026-04-25","desc":"교양_오락","amount":81200,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003634,"date":"2026-04-27","desc":"교육","amount":30000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003635,"date":"2026-04-30","desc":"교통","amount":3100,"type":"expense","category":"transport","fromRecurring":false},{"id":1782625003636,"date":"2026-04-01","desc":"식비","amount":7300,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003637,"date":"2026-04-02","desc":"식비","amount":4000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003638,"date":"2026-04-03","desc":"식비","amount":42000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003639,"date":"2026-04-03","desc":"식비","amount":8400,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003640,"date":"2026-04-04","desc":"식비","amount":16000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003641,"date":"2026-04-07","desc":"식비","amount":7300,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003642,"date":"2026-04-07","desc":"식비","amount":10800,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003643,"date":"2026-04-08","desc":"식비","amount":18700,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003644,"date":"2026-04-09","desc":"식비","amount":24900,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003645,"date":"2026-04-09","desc":"식비","amount":19000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003646,"date":"2026-04-10","desc":"식비","amount":22000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003647,"date":"2026-04-11","desc":"식비","amount":20000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003648,"date":"2026-04-13","desc":"식비","amount":22000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003649,"date":"2026-04-13","desc":"식비","amount":19600,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003650,"date":"2026-04-14","desc":"식비","amount":17800,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003651,"date":"2026-04-16","desc":"식비","amount":1500,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003652,"date":"2026-04-17","desc":"식비","amount":8500,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003653,"date":"2026-04-18","desc":"식비","amount":22600,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003654,"date":"2026-04-18","desc":"식비","amount":22500,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003655,"date":"2026-04-18","desc":"식비","amount":88000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003656,"date":"2026-04-22","desc":"식비","amount":26700,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003657,"date":"2026-04-22","desc":"식비","amount":3900,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003658,"date":"2026-04-22","desc":"식비","amount":22000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003659,"date":"2026-04-24","desc":"식비","amount":34200,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003660,"date":"2026-04-02","desc":"컬리","amount":79759,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003661,"date":"2026-04-15","desc":"컬리","amount":90811,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003662,"date":"2026-04-28","desc":"컬리","amount":71690,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003663,"date":"2026-04-02","desc":"교양_오락","amount":30068,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003664,"date":"2026-04-16","desc":"교양_오락","amount":33800,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003665,"date":"2026-04-16","desc":"피복","amount":36000,"type":"expense","category":"shopping","fromRecurring":false},{"id":1782625003666,"date":"2026-04-19","desc":"주거","amount":12900,"type":"expense","category":"housing","fromRecurring":false},{"id":1782625003667,"date":"2026-04-25","desc":"교제비","amount":30000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003668,"date":"2026-04-27","desc":"보건위생","amount":30820,"type":"expense","category":"medical","fromRecurring":false},{"id":1782625003669,"date":"2026-04-30","desc":"주거","amount":54450,"type":"expense","category":"housing","fromRecurring":false},{"id":1782625003670,"date":"2026-05-05","desc":"컬리","amount":88076,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003671,"date":"2026-05-05","desc":"컬리","amount":37341,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003672,"date":"2026-05-06","desc":"교통","amount":62900,"type":"expense","category":"transport","fromRecurring":false},{"id":1782625003673,"date":"2026-05-09","desc":"부모님","amount":49000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003674,"date":"2026-05-10","desc":"교양_오락","amount":6000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003675,"date":"2026-05-10","desc":"식비","amount":17600,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003676,"date":"2026-05-10","desc":"교양_오락","amount":6600,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003677,"date":"2026-05-10","desc":"교양_오락","amount":16600,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003678,"date":"2026-05-10","desc":"교제비","amount":98290,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003679,"date":"2026-05-11","desc":"교양_오락","amount":17000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003680,"date":"2026-05-11","desc":"교제비","amount":50000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003681,"date":"2026-05-12","desc":"교양_오락","amount":260000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003682,"date":"2026-05-13","desc":"컬리","amount":75663,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003683,"date":"2026-05-13","desc":"피복","amount":70030,"type":"expense","category":"shopping","fromRecurring":false},{"id":1782625003684,"date":"2026-05-15","desc":"교양_오락","amount":1100,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003685,"date":"2026-05-15","desc":"교양_오락","amount":14500,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003686,"date":"2026-05-15","desc":"교양_오락","amount":11300,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003687,"date":"2026-05-16","desc":"교양_오락","amount":10000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003688,"date":"2026-05-16","desc":"식비","amount":18000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003689,"date":"2026-05-16","desc":"교양_오락","amount":12000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003690,"date":"2026-05-16","desc":"교양_오락","amount":19000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003691,"date":"2026-05-17","desc":"교양_오락","amount":30000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003692,"date":"2026-05-18","desc":"교제비","amount":20000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003693,"date":"2026-05-18","desc":"교양_오락","amount":52000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003694,"date":"2026-05-18","desc":"교제비","amount":38000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003695,"date":"2026-05-21","desc":"식비","amount":25200,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003696,"date":"2026-05-21","desc":"교통","amount":4100,"type":"expense","category":"transport","fromRecurring":false},{"id":1782625003697,"date":"2026-05-23","desc":"교양_오락","amount":28700,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003698,"date":"2026-05-24","desc":"교양_오락","amount":11000,"type":"expense","category":"etc","fromRecurring":false},{"id":1782625003699,"date":"2026-05-25","desc":"교통","amount":4100,"type":"expense","category":"transport","fromRecurring":false},{"id":1782625003700,"date":"2026-05-26","desc":"컬리","amount":64792,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003701,"date":"2026-05-31","desc":"교통","amount":6100,"type":"expense","category":"transport","fromRecurring":false},{"id":1782625003702,"date":"2026-05-01","desc":"식비","amount":40000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003703,"date":"2026-05-01","desc":"식비","amount":13500,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003704,"date":"2026-05-01","desc":"식비","amount":11100,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003705,"date":"2026-05-01","desc":"식비","amount":58000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003706,"date":"2026-05-01","desc":"식비","amount":44500,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003707,"date":"2026-05-01","desc":"식비","amount":22400,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003708,"date":"2026-05-01","desc":"식비","amount":12700,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003709,"date":"2026-05-01","desc":"식비","amount":2000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003710,"date":"2026-05-01","desc":"식비","amount":1140,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003711,"date":"2026-05-01","desc":"식비","amount":20000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003712,"date":"2026-05-01","desc":"식비","amount":35500,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003713,"date":"2026-05-01","desc":"식비","amount":28500,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003714,"date":"2026-05-01","desc":"식비","amount":13800,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003715,"date":"2026-05-01","desc":"식비","amount":100000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003716,"date":"2026-05-01","desc":"식비","amount":41900,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003717,"date":"2026-05-01","desc":"식비","amount":13000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003718,"date":"2026-05-01","desc":"식비","amount":12300,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003719,"date":"2026-05-01","desc":"식비","amount":11200,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003720,"date":"2026-05-01","desc":"식비","amount":16000,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003721,"date":"2026-05-01","desc":"식비","amount":11600,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003722,"date":"2026-05-01","desc":"식비","amount":10800,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003723,"date":"2026-05-01","desc":"식비","amount":7800,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003724,"date":"2026-05-01","desc":"식비","amount":18500,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003725,"date":"2026-05-01","desc":"식비","amount":46400,"type":"expense","category":"food","fromRecurring":false},{"id":1782625003726,"date":"2026-05-01","desc":"식비","amount":29000,"type":"expense","category":"food","fromRecurring":false}];
+  const existing = new Set(ledgerEntries.map(e => e.date + '|' + e.desc + '|' + e.amount));
+  const dupes = [];
+  const toAdd = [];
+  IMPORT_DATA.forEach(function(e) {
+    const key = e.date + '|' + e.desc + '|' + e.amount;
+    if (existing.has(key)) { dupes.push(e); }
+    else { toAdd.push(e); }
+  });
+  if (toAdd.length === 0) {
+    alert('중복 확인 결과: 추가할 새 항목이 없어요.\n(전체 ' + IMPORT_DATA.length + '건이 이미 존재)');
+    return;
+  }
+  const msg = '4-5월 지출 ' + toAdd.length + '건을 추가할게요.'
+    + (dupes.length > 0 ? '\n(중복 ' + dupes.length + '건 제외)' : '')
+    + '\n\n계속할까요?';
+  if (!confirm(msg)) return;
+  toAdd.forEach(function(e) {
+    ledgerEntries.push({
+      id: Date.now() + Math.floor(Math.random()*1000),
+      date: e.date,
+      desc: e.desc,
+      amount: e.amount,
+      type: e.type,
+      category: e.category,
+      fromRecurring: false
+    });
+  });
+  save(LS.ledger, ledgerEntries);
+  renderTab('ledger');
+  alert('✅ ' + toAdd.length + '건 임포트 완료!');
+}
+
 function exportLedgerCsv() {
   const rows = [['날짜','구분','카테고리','내용','금액']];
   [...ledgerEntries].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>{
@@ -1851,25 +1891,54 @@ function ledgerChangeMonth(dir) {
 // ── 반복 지출/수입 모달 ──
 function openRecurringModal() {
   document.getElementById('rc-list').innerHTML = ledgerRecurring.length === 0
-    ? `<div style="font-size:12px;color:var(--text3);padding:8px 0">등록된 반복 항목이 없어요</div>`
-    : ledgerRecurring.map(r=>{ const info = ledgerCategoryInfo(r.category); return `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="min-width:0">
-        <div style="font-size:13px;color:var(--text)">${r.desc} <span style="color:var(--text3);font-size:11px">매월 ${r.day}일</span></div>
-        <div style="font-size:11px;color:var(--text2)">${info.label} · ${r.type==='income'?'+':'-'}${r.amount.toLocaleString()}원</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);cursor:pointer">
-          <input type="checkbox" ${r.active?'checked':''} onchange="toggleRecurring(${r.id})"> 활성
-        </label>
-        <span onclick="deleteRecurring(${r.id})" style="color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--text3)'">×</span>
-      </div>
-    </div>`; }).join('');
+    ? '<div style="font-size:12px;color:var(--text3);padding:8px 0">등록된 반복 항목이 없어요</div>'
+    : ledgerRecurring.map(function(r){
+        const info = ledgerCategoryInfo(r.category);
+        const typeColor = r.type==='income' ? '#4ade80' : '#f87171';
+        return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">'
+          +   '<div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1">'
+          +     '<input value="'+r.desc+'" onchange="editRecurring('+r.id+',\'desc\',this.value)" '
+          +       'style="font-size:13px;color:var(--text);background:transparent;border:none;border-bottom:1px solid transparent;outline:none;min-width:0;flex:1;padding:1px 2px;cursor:text" '
+          +       'onfocus="this.style.borderBottomColor=\'var(--border2)\'" onblur="this.style.borderBottomColor=\'transparent\'">'
+          +     '<span style="color:var(--text3);font-size:11px;white-space:nowrap">매월</span>'
+          +     '<input type="text" inputmode="numeric" value="'+r.day+'" '
+          +       'onchange="editRecurring('+r.id+',\'day\',Math.min(28,Math.max(1,Number(this.value.replace(/[^0-9]/g,\'\'))||1)))" '
+          +       'style="font-size:11px;color:var(--text2);background:var(--surface2);border:1px solid var(--border2);border-radius:5px;outline:none;width:36px;padding:2px 5px;text-align:center;-moz-appearance:textfield" '
+          +       'onfocus="this.style.borderColor=\'var(--accent2)\'" onblur="this.style.borderColor=\'var(--border2)\'">'
+          +     '<span style="color:var(--text3);font-size:11px">일</span>'
+          +   '</div>'
+          +   '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
+          +     '<label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);cursor:pointer">'
+          +       '<input type="checkbox" '+(r.active?'checked':'')+' onchange="toggleRecurring('+r.id+')"> 활성'
+          +     '</label>'
+          +     '<span onclick="deleteRecurring('+r.id+')" style="color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px" onmouseover="this.style.color=\'#f87171\'" onmouseout="this.style.color=\'var(--text3)\'">×</span>'
+          +   '</div>'
+          + '</div>'
+          + '<div style="display:flex;align-items:center;gap:8px">'
+          +   '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:'+info.color+'18;color:'+info.color+';border:1px solid '+info.color+'33;flex-shrink:0">'+info.label+'</span>'
+          +   '<span style="font-size:11px;color:var(--text3)">·</span>'
+          +   '<span style="font-size:11px;color:'+typeColor+'">'+(r.type==='income'?'+':'-')+'</span>'
+          +   '<input type="text" inputmode="numeric" value="'+r.amount.toLocaleString()+'" '
+          +     'oninput="this.value=this.value.replace(/[^0-9]/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\')" '
+          +     'onchange="editRecurring('+r.id+',\'amount\',Number(this.value.replace(/,/g,\'\'))||0)" '
+          +     'style="font-size:12px;color:var(--text);background:transparent;border:none;border-bottom:1px solid transparent;outline:none;width:100px;padding:1px 2px;cursor:text;text-align:right" '
+          +     'onfocus="this.style.borderBottomColor=\'var(--border2)\'" onblur="this.style.borderBottomColor=\'transparent\'">'
+          +   '<span style="font-size:11px;color:var(--text2)">원</span>'
+          + '</div>'
+          + '</div>';
+      }).join('');
   document.getElementById('rc-desc').value = '';
   document.getElementById('rc-amount').value = '';
   document.getElementById('rc-day').value = '1';
   rcSetType('expense');
   document.getElementById('recurring-modal').classList.add('open');
+}
+function editRecurring(id, field, value) {
+  const r = ledgerRecurring.find(x=>x.id===id);
+  if (!r) return;
+  r[field] = value;
+  save(LS.ledgerRecurring, ledgerRecurring);
 }
 function closeRecurringModal() { document.getElementById('recurring-modal').classList.remove('open'); }
 let rcCurrentType = 'expense';
@@ -2381,18 +2450,13 @@ function tabHTML(tab) {
     const catRows = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
     const maxCat = catRows.length ? catRows[0][1] : 1;
 
-    // 최근 6개월 지출 추이
-    const trendMonths = [];
-    let cursor = mk;
-    for (let i=0;i<6;i++) { trendMonths.unshift(cursor); cursor = ledgerPrevMonthKey(cursor); }
-    const trendData = trendMonths.map(m => ({
-      month: m,
-      expense: ledgerEntries.filter(e=>ledgerMonthKey(e.date)===m && e.type==='expense').reduce((s,e)=>s+e.amount,0)
-    }));
-    const maxTrend = Math.max(1, ...trendData.map(t=>t.expense));
-
-    // 연간 누적 통계
+    // 해당 연도 1-12월 전체 지출 추이
     const yk = ledgerYearKey(mk + '-01');
+    const allLedgerMonths = Array.from({length:12}, function(_,i){ return yk+'-'+String(i+1).padStart(2,'0'); });
+    const trendData = allLedgerMonths.map(function(m){
+      return { month:m, expense: ledgerEntries.filter(function(e){ return ledgerMonthKey(e.date)===m && e.type==='expense'; }).reduce(function(s,e){ return s+e.amount; },0) };
+    });
+    const maxTrend = Math.max(1, ...trendData.map(function(t){ return t.expense; }));
     const yearEntries = ledgerEntries.filter(e=>ledgerYearKey(e.date)===yk);
     const yearIncome = yearEntries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
     const yearExpense = yearEntries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
@@ -2412,13 +2476,15 @@ function tabHTML(tab) {
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button onclick="openRecurringModal()" style="font-size:12px;padding:7px 12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);border-radius:8px;cursor:pointer">🔁 반복관리</button>
           <button onclick="exportLedgerCsv()" style="font-size:12px;padding:7px 12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);border-radius:8px;cursor:pointer">⬇ CSV</button>
+          <button onclick="importFromExcel()" style="font-size:12px;padding:7px 12px;background:rgba(127,200,232,0.12);border:1px solid rgba(127,200,232,0.3);color:var(--accent2);border-radius:8px;cursor:pointer">📥 엑셀 임포트</button>
           <button class="task-add-btn" style="font-size:13px;padding:7px 14px" onclick="openLedgerModal()">+ 내역 추가</button>
         </div>
       </div>
       <div class="ledger-summary-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px">
           <div style="font-size:11px;color:var(--text2);margin-bottom:4px">수입</div>
-          <div style="font-size:18px;font-weight:600;color:#4ade80">+${totalIncome.toLocaleString()}원</div>
+          <div style="font-size:18px;font-weight:600;color:#4ade80">+${(totalIncome+divThisMonth).toLocaleString()}원</div>
+          ${divThisMonth>0 ? '<div style="font-size:10px;color:var(--text3);margin-top:3px">가계부 '+totalIncome.toLocaleString()+'원 + 배당 '+divThisMonth.toLocaleString()+'원</div>' : ''}
         </div>
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px">
           <div style="font-size:11px;color:var(--text2);margin-bottom:4px">지출</div>
@@ -2426,40 +2492,136 @@ function tabHTML(tab) {
         </div>
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px">
           <div style="font-size:11px;color:var(--text2);margin-bottom:4px">순잔액</div>
-          <div style="font-size:18px;font-weight:600;color:${net>=0?'var(--accent2)':'#f87171'}">${net>=0?'+':''}${net.toLocaleString()}원</div>
+          <div style="font-size:18px;font-weight:600;color:${combinedNet>=0?'var(--accent2)':'#f87171'}">${combinedNet>=0?'+':''}${combinedNet.toLocaleString()}원</div>
         </div>
-      </div>
-      <div style="background:rgba(127,200,232,0.08);border:1px solid rgba(127,200,232,0.25);border-radius:10px;padding:10px 12px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:12px;color:var(--text2)">💰 가계부 순잔액 + 📈 이번 달 배당(${divThisMonth.toLocaleString()}원) 포함</span>
-        <span style="font-size:15px;font-weight:600;color:${combinedNet>=0?'var(--accent2)':'#f87171'}">${combinedNet>=0?'+':''}${combinedNet.toLocaleString()}원</span>
       </div>
 
       <div style="margin-bottom:18px">
-        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">최근 6개월 지출 추이</div>
-        <div style="display:flex;align-items:flex-end;gap:8px;height:90px">
-          ${trendData.map(t=>`
-          <div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:4px">
-            <div style="font-size:9px;color:var(--text3)">${t.expense>0?Math.round(t.expense/1000)+'k':''}</div>
-            <div style="width:100%;max-width:32px;height:${Math.max(2,Math.round(t.expense/maxTrend*60))}px;background:${t.month===mk?'var(--accent)':'rgba(240,184,110,0.3)'};border-radius:4px 4px 0 0;transition:height 0.3s"></div>
-            <div style="font-size:9px;color:${t.month===mk?'var(--text)':'var(--text3)'}">${t.month.slice(5)}월</div>
-          </div>`).join('')}
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">${yk}년 월별 지출 추이</div>
+        <div style="display:flex;align-items:flex-end;gap:2px;height:100px">
+          ${(function(){
+            return trendData.map(function(t){
+              var isCur = t.month===mk;
+              var barH = Math.max(t.expense>0?3:1, Math.round(t.expense/maxTrend*70));
+              var mNum = parseInt(t.month.slice(5),10);
+              var amtLabel = t.expense>0 ? Math.round(t.expense/10000)+'만' : '';
+              var amtColor = t.expense>0 ? (isCur?'var(--text)':'var(--text3)') : 'transparent';
+              var barBg = isCur ? 'var(--accent)' : (t.expense>0 ? 'rgba(240,184,110,0.4)' : 'rgba(255,255,255,0.05)');
+              var barShadow = isCur ? 'box-shadow:0 0 8px rgba(240,184,110,0.5);' : '';
+              var lbColor = isCur ? 'var(--text)' : 'var(--text3)';
+              var lbWeight = isCur ? '600' : '400';
+              return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:3px;cursor:pointer;border-radius:4px;padding:0 1px" onclick="ledgerChangeMonth(\''+t.month+'\')" title="'+mNum+'월 '+(t.expense>0?t.expense.toLocaleString()+'원':'데이터 없음')+'">'
+                + '<div style="font-size:8px;color:'+amtColor+';line-height:1">'+amtLabel+'</div>'
+                + '<div style="width:100%;height:'+barH+'px;background:'+barBg+';border-radius:3px 3px 0 0;transition:all 0.25s;'+barShadow+'"></div>'
+                + '<div style="font-size:9px;color:'+lbColor+';font-weight:'+lbWeight+'">'+mNum+'월</div>'
+                + '</div>';
+            }).join('');
+          })()}
         </div>
       </div>
 
-      ${catRows.length ? `
-      <div style="margin-bottom:16px">
-        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">카테고리별 지출</div>
-        ${catRows.map(([key,amt])=>{ const info = ledgerCategoryInfo(key); return `
-        <div style="margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-            <span style="color:var(--text)">${info.label}</span>
-            <span style="color:var(--text2)">${amt.toLocaleString()}원</span>
-          </div>
-          <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
-            <div style="width:${Math.round(amt/maxCat*100)}%;height:100%;background:${info.color};border-radius:3px"></div>
-          </div>
-        </div>`; }).join('')}
-      </div>` : ''}
+      ${(function(){
+        if(!catRows.length) return '';
+        return '<div style="margin-bottom:16px">'
+          +'<div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">카테고리별 지출</div>'
+          +catRows.map(function(r){ var key=r[0],amt=r[1]; var info=ledgerCategoryInfo(key); return ''
+            +'<div style="margin-bottom:8px">'
+            +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">'
+            +'<span style="color:var(--text)">'+info.label+'</span>'
+            +'<span style="color:var(--text2)">'+amt.toLocaleString()+'원</span>'
+            +'</div>'
+            +'<div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">'
+            +'<div style="width:'+Math.round(amt/maxCat*100)+'%;height:100%;background:'+info.color+';border-radius:3px"></div>'
+            +'</div></div>';
+          }).join('')
+          +'</div>';
+      })()}
+
+      ${(function(){
+        if(!catRows.length) return '';
+
+        // ── 도넛 차트 ──
+        const DONUT_R = 54, DONUT_CX = 70, DONUT_CY = 70, STROKE = 22;
+        const circum = 2 * Math.PI * DONUT_R;
+        let offset = 0;
+        const segments = catRows.map(function(r){
+          const key=r[0], amt=r[1];
+          const info = ledgerCategoryInfo(key);
+          const pct = amt / totalExpense;
+          const dash = pct * circum;
+          const seg = '<circle cx="'+DONUT_CX+'" cy="'+DONUT_CY+'" r="'+DONUT_R+'" fill="none"'
+            +' stroke="'+info.color+'" stroke-width="'+STROKE+'"'
+            +' stroke-dasharray="'+dash.toFixed(2)+' '+(circum-dash).toFixed(2)+'"'
+            +' stroke-dashoffset="'+(-offset).toFixed(2)+'"'
+            +' transform="rotate(-90 '+DONUT_CX+' '+DONUT_CY+')">'
+            +'<title>'+info.label+' '+amt.toLocaleString()+'원 ('+Math.round(pct*100)+'%)</title>'
+            +'</circle>';
+          offset += dash;
+          return seg;
+        }).join('');
+
+        const legend = catRows.map(function(r){
+          const key=r[0], amt=r[1];
+          const info = ledgerCategoryInfo(key);
+          const pct = Math.round(amt/totalExpense*100);
+          return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+            +'<div style="width:10px;height:10px;border-radius:3px;background:'+info.color+';flex-shrink:0"></div>'
+            +'<span style="font-size:11px;color:var(--text2);flex:1">'+info.label+'</span>'
+            +'<span style="font-size:11px;color:var(--text);font-weight:500">'+pct+'%</span>'
+            +'<span style="font-size:10px;color:var(--text3);min-width:70px;text-align:right">'+amt.toLocaleString()+'원</span>'
+            +'</div>';
+        }).join('');
+
+        // ── 주차별 지출 흐름 ──
+        const expEntries = monthEntries.filter(function(e){return e.type==='expense';});
+        const weeks = [0,0,0,0,0]; // 1~5주
+        expEntries.forEach(function(e){
+          const day = parseInt(e.date.slice(8),10);
+          const w = Math.min(4, Math.floor((day-1)/7));
+          weeks[w] += e.amount;
+        });
+        const activeWeeks = weeks.filter(function(v){return v>0;}).length || 1;
+        const maxWeek = Math.max(1, ...weeks);
+        const weekBars = weeks.slice(0, activeWeeks === 1 ? 1 : 5).map(function(amt,i){
+          const h = Math.max(amt>0?4:1, Math.round(amt/maxWeek*70));
+          const isBig = amt === maxWeek && amt > 0;
+          const bg = isBig ? '#f87171' : (amt>0 ? 'rgba(248,113,113,0.4)' : 'rgba(255,255,255,0.05)');
+          return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;justify-content:flex-end">'
+            +(amt>0 ? '<div style="font-size:9px;color:var(--text3)">'+Math.round(amt/10000)+'만</div>' : '<div style="font-size:9px;color:transparent">0</div>')
+            +'<div style="width:100%;height:'+h+'px;background:'+bg+';border-radius:3px 3px 0 0;transition:height 0.3s'+(isBig?';box-shadow:0 0 8px rgba(248,113,113,0.4)':'')+'"></div>'
+            +'<div style="font-size:9px;color:'+(amt>0?'var(--text2)':'var(--text3)')+'">'+( i+1)+'주</div>'
+            +'</div>';
+        }).join('');
+
+        const bigWeekIdx = weeks.indexOf(maxWeek);
+        const bigWeekLabel = (bigWeekIdx+1)+'주차';
+        const comment = maxWeek > 0 ? ('<span style="font-size:10px;color:#f87171">'+bigWeekLabel+'</span><span style="font-size:10px;color:var(--text3)">에 가장 많이 지출했어요 ('+maxWeek.toLocaleString()+'원)</span>') : '';
+
+        return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px">'
+          +'<div style="font-size:11px;color:var(--text2);margin-bottom:12px;letter-spacing:0.03em">📊 지출 분석</div>'
+
+          // 도넛 + 범례
+          +'<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap">'
+          +'<div style="flex-shrink:0">'
+          +'<svg width="140" height="140" viewBox="0 0 140 140">'
+          +segments
+          +'<text x="70" y="65" text-anchor="middle" fill="var(--text)" font-size="13" font-weight="600">지출</text>'
+          +'<text x="70" y="82" text-anchor="middle" fill="var(--text2)" font-size="10">'+totalExpense.toLocaleString()+'원</text>'
+          +'</svg>'
+          +'</div>'
+          +'<div style="flex:1;min-width:140px">'+legend+'</div>'
+          +'</div>'
+
+          // 주차별 흐름
+          +'<div style="border-top:1px solid var(--border);padding-top:12px">'
+          +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+          +'<span style="font-size:11px;color:var(--text2)">주차별 지출 흐름</span>'
+          +'<span>'+comment+'</span>'
+          +'</div>'
+          +'<div style="display:flex;align-items:flex-end;gap:6px;height:90px">'+weekBars+'</div>'
+          +'</div>'
+          +'</div>';
+      })()}
 
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px">
         <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">${yk}년 누적</div>
@@ -2472,20 +2634,23 @@ function tabHTML(tab) {
 
       <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">${ledgerMonthLabel(mk)} 내역</div>
       <div style="max-height:320px;overflow-y:auto">
-        ${monthEntriesSorted.length===0 ? `<div style="font-size:13px;color:var(--text3);text-align:center;padding:20px 0">이 달엔 등록된 내역이 없어요</div>` : monthEntriesSorted.map(e=>{ const info = ledgerCategoryInfo(e.category); return `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
-          <div style="display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer" onclick="openLedgerModal(${e.id})">
-            <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${info.color}18;color:${info.color};border:1px solid ${info.color}33;flex-shrink:0">${info.label}</span>
-            <div style="min-width:0">
-              <div style="font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.desc||'(내용 없음)'}${e.fromRecurring?' <span style="color:var(--text3);font-size:10px">🔁</span>':''}</div>
-              <div style="font-size:10px;color:var(--text3)">${e.date}</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-            <span style="font-size:13px;font-weight:600;color:${e.type==='income'?'#4ade80':'#f87171'}">${e.type==='income'?'+':'-'}${e.amount.toLocaleString()}원</span>
-            <span onclick="deleteLedgerEntry(${e.id})" style="color:var(--text3);cursor:pointer;font-size:15px;padding:2px 5px" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--text3)'">×</span>
-          </div>
-        </div>`; }).join('')}
+        ${(function(){
+          if(!monthEntriesSorted.length) return '<div style="font-size:13px;color:var(--text3);text-align:center;padding:20px 0">이 달엔 등록된 내역이 없어요</div>';
+          return monthEntriesSorted.map(function(e){
+            var info = ledgerCategoryInfo(e.category);
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">'
+              +'<div style="display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer" onclick="openLedgerModal('+e.id+')">'
+              +'<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:'+info.color+'18;color:'+info.color+';border:1px solid '+info.color+'33;flex-shrink:0">'+info.label+'</span>'
+              +'<div style="min-width:0">'
+              +'<div style="font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(e.desc||'(내용 없음)')+(e.fromRecurring?' <span style="color:var(--text3);font-size:10px">🔁</span>':'')+'</div>'
+              +'<div style="font-size:10px;color:var(--text3)">'+e.date+'</div>'
+              +'</div></div>'
+              +'<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">'
+              +'<span style="font-size:13px;font-weight:600;color:'+(e.type==='income'?'#4ade80':'#f87171')+'">'+(e.type==='income'?'+':'-')+e.amount.toLocaleString()+'원</span>'
+              +'<span onclick="deleteLedgerEntry('+e.id+')" style="color:var(--text3);cursor:pointer;font-size:15px;padding:2px 5px" onmouseover="this.style.color=\'#f87171\'" onmouseout="this.style.color=\'var(--text3)\'">×</span>'
+              +'</div></div>';
+          }).join('');
+        })()}
       </div>
     </div>`;
   }
@@ -2499,24 +2664,26 @@ function tabHTML(tab) {
     function personBlock(person) {
       const rows = monthEntries.filter(d=>d.person===person).sort((a,b)=>b.amount-a.amount);
       const subtotal = rows.reduce((s,d)=>s+d.amount,0);
-      return `
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;flex:1;min-width:0">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <div style="font-size:13px;font-weight:600;color:var(--text)">${person}</div>
-          <div style="font-size:14px;font-weight:600;color:var(--accent)">${subtotal.toLocaleString()}원</div>
-        </div>
-        ${rows.length===0 ? `<div style="font-size:12px;color:var(--text3);padding:8px 0">등록된 내역 없음</div>` : rows.map(d=>`
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--border);cursor:pointer" onclick="openDividendModal(${d.id})">
-          <div style="min-width:0">
-            <div style="font-size:13px;color:var(--text)">${d.stock}</div>
-            <div style="font-size:10px;color:var(--text3)">${d.shares.toLocaleString()}주</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-            <span style="font-size:13px;font-weight:500;color:var(--accent2)">${d.amount.toLocaleString()}원</span>
-            <span onclick="event.stopPropagation();deleteDividendEntry(${d.id})" style="color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--text3)'">×</span>
-          </div>
-        </div>`).join('')}
-      </div>`;
+      const rowsHtml = rows.length===0
+        ? '<div style="font-size:12px;color:var(--text3);padding:8px 0">등록된 내역 없음</div>'
+        : rows.map(function(d){
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--border);cursor:pointer" onclick="openDividendModal('+d.id+')">'
+              + '<div style="min-width:0">'
+              + '<div style="font-size:13px;color:var(--text)">'+d.stock+'</div>'
+              + '<div style="font-size:10px;color:var(--text3)">'+d.shares.toLocaleString()+'주</div>'
+              + '</div>'
+              + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
+              + '<span style="font-size:13px;font-weight:500;color:var(--accent2)">'+d.amount.toLocaleString()+'원</span>'
+              + '<span onclick="event.stopPropagation();deleteDividendEntry('+d.id+')" style="color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px" onmouseover="this.style.color=\'#f87171\'" onmouseout="this.style.color=\'var(--text3)\'">×</span>'
+              + '</div></div>';
+          }).join('');
+      return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;flex:1;min-width:0">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+        + '<div style="font-size:13px;font-weight:600;color:var(--text)">'+person+'</div>'
+        + '<div style="font-size:14px;font-weight:600;color:var(--accent)">'+subtotal.toLocaleString()+'원</div>'
+        + '</div>'
+        + rowsHtml
+        + '</div>';
     }
 
     // 종목별 합계 (이번 달)
@@ -2576,20 +2743,23 @@ function tabHTML(tab) {
           })()}
         </div>
       </div>
-      ${stockRows.length ? `
-      <div style="margin-bottom:16px">
-        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">종목별 합계 (이번 달, 전체)</div>
-        ${stockRows.map(([stock,amt])=>`
-        <div style="margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-            <span style="color:var(--text)">${stock}</span>
-            <span style="color:var(--text2)">${amt.toLocaleString()}원</span>
-          </div>
-          <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
-            <div style="width:${Math.round(amt/maxStock*100)}%;height:100%;background:var(--accent2);border-radius:3px"></div>
-          </div>
-        </div>`).join('')}
-      </div>` : ''}
+      ${(function(){
+        if(!stockRows.length) return '';
+        return '<div style="margin-bottom:16px">'
+          + '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">종목별 합계 (이번 달, 전체)</div>'
+          + stockRows.map(function(r){
+              var stock=r[0], amt=r[1];
+              return '<div style="margin-bottom:8px">'
+                + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">'
+                + '<span style="color:var(--text)">'+stock+'</span>'
+                + '<span style="color:var(--text2)">'+amt.toLocaleString()+'원</span>'
+                + '</div>'
+                + '<div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">'
+                + '<div style="width:'+Math.round(amt/maxStock*100)+'%;height:100%;background:var(--accent2);border-radius:3px"></div>'
+                + '</div></div>';
+            }).join('')
+          + '</div>';
+      })()}
       <div class="dividend-person-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         ${DIV_PEOPLE.map(p=>personBlock(p)).join('')}
       </div>
@@ -2597,40 +2767,37 @@ function tabHTML(tab) {
         <div style="font-size:11px;color:var(--text2);margin-bottom:10px;letter-spacing:0.03em">${yk}년 누적 배당</div>
         <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:baseline;margin-bottom:12px">
           <div><span style="font-size:13px;color:var(--text2)">총 </span><span style="font-size:16px;font-weight:600;color:var(--accent)">${yearTotal.toLocaleString()}원</span></div>
-          ${yearByPerson.map(p=>`<div><span style="font-size:11px;color:var(--text2)">${p.person} </span><span style="font-size:13px;font-weight:600;color:var(--text)">${p.total.toLocaleString()}원</span></div>`).join('')}
+          ${yearByPerson.map(function(p){ return '<div><span style="font-size:11px;color:var(--text2)">'+p.person+' </span><span style="font-size:13px;font-weight:600;color:var(--text)">'+p.total.toLocaleString()+'원</span></div>'; }).join('')}
         </div>
-        ${(()=>{
-          // 배당 기록이 있는 월 수 계산 (해당 연도)
-          const yearMonths = [...new Set(dividendEntries.filter(d=>dividendYearKey(d.month)===yk).map(d=>d.month))];
+        ${(function(){
+          const yearMonths = [...new Set(dividendEntries.filter(function(d){return dividendYearKey(d.month)===yk;}).map(function(d){return d.month;}))];
           const monthCount = yearMonths.length;
           const avgMonthly = monthCount > 0 ? Math.round(yearTotal / monthCount) : 0;
           const goalVal = dividendGoal || 0;
-          // 달성률 = 월평균 ÷ 목표
           const goalPct = goalVal > 0 && avgMonthly > 0 ? Math.min(Math.round(avgMonthly / goalVal * 100), 999) : 0;
           const goalBarW = goalVal > 0 && avgMonthly > 0 ? Math.min(avgMonthly / goalVal * 100, 100) : 0;
           const goalColor = goalPct >= 100 ? '#4ade80' : goalPct >= 70 ? 'var(--accent)' : 'var(--accent2)';
-
-          return `
-        <div style="border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:10px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:11px;color:var(--text2)">월 평균 배당 <span style="font-size:10px;color:var(--text3)">(${monthCount}개월 기준)</span></span>
-            <span style="font-size:14px;font-weight:600;color:var(--accent2)">${avgMonthly > 0 ? avgMonthly.toLocaleString()+'원' : '—'}</span>
-          </div>
-          ${goalVal > 0 ? `
-          <div>
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <span style="font-size:11px;color:var(--text2)">월평균 달성률 <span style="font-size:10px;color:var(--text3)">(평균 ÷ 목표)</span></span>
-              <span style="font-size:13px;font-weight:600;color:${goalColor}">${goalPct}%</span>
-            </div>
-            <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden">
-              <div style="width:${goalBarW}%;height:100%;background:${goalColor};border-radius:4px;transition:width 0.4s"></div>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-top:4px">
-              <span style="font-size:10px;color:var(--text3)">월평균 ${avgMonthly.toLocaleString()}원</span>
-              <span style="font-size:10px;color:var(--text3)">목표 ${goalVal.toLocaleString()}원</span>
-            </div>
-          </div>` : ''}
-        </div>`;
+          let html = '<div style="border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:10px">';
+          html += '<div style="display:flex;align-items:center;justify-content:space-between">';
+          html += '<span style="font-size:11px;color:var(--text2)">월 평균 배당 <span style="font-size:10px;color:var(--text3)">(' + monthCount + '개월 기준)</span></span>';
+          html += '<span style="font-size:14px;font-weight:600;color:var(--accent2)">' + (avgMonthly > 0 ? avgMonthly.toLocaleString()+'원' : '—') + '</span>';
+          html += '</div>';
+          if(goalVal > 0) {
+            html += '<div>';
+            html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+            html += '<span style="font-size:11px;color:var(--text2)">월평균 달성률 <span style="font-size:10px;color:var(--text3)">(평균 ÷ 목표)</span></span>';
+            html += '<span style="font-size:13px;font-weight:600;color:'+goalColor+'">'+goalPct+'%</span>';
+            html += '</div>';
+            html += '<div style="height:6px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden">';
+            html += '<div style="width:'+goalBarW+'%;height:100%;background:'+goalColor+';border-radius:4px;transition:width 0.4s"></div>';
+            html += '</div>';
+            html += '<div style="display:flex;justify-content:space-between;margin-top:4px">';
+            html += '<span style="font-size:10px;color:var(--text3)">월평균 '+avgMonthly.toLocaleString()+'원</span>';
+            html += '<span style="font-size:10px;color:var(--text3)">목표 '+goalVal.toLocaleString()+'원</span>';
+            html += '</div></div>';
+          }
+          html += '</div>';
+          return html;
         })()}
       </div>
 
