@@ -266,8 +266,23 @@ html, body {
   display: flex; align-items: center; gap: 10px;
   padding: 11px 0; border-bottom: 1px solid var(--border);
   font-size: 14px; color: var(--text);
+  transition: background 0.15s, opacity 0.15s;
+  border-radius: 6px;
 }
 .goal-item:last-child { border-bottom: none; }
+.goal-item.dragging { opacity: 0.32; }
+.goal-item.drag-over { background: rgba(255,255,255,0.05); }
+.goal-drag-handle {
+  display: flex; flex-direction: column; gap: 3px;
+  cursor: grab; padding: 2px 3px; flex-shrink: 0; opacity: 0.25;
+  transition: opacity 0.15s;
+}
+.goal-drag-handle:active { cursor: grabbing; }
+.goal-item:hover .goal-drag-handle { opacity: 0.6; }
+.goal-drag-handle span {
+  display: block; width: 12px; height: 1.5px;
+  background: var(--text2); border-radius: 2px;
+}
 .goal-dot {
   width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
   background: var(--text2);
@@ -337,6 +352,9 @@ html, body {
   .task-delete { opacity: 0.6; }
   .week-task-delete { opacity: 0.5 !important; }
   .modal { width: calc(100vw - 40px); }
+  .ledger-summary-grid { grid-template-columns: 1fr !important; }
+  .dividend-summary-grid { grid-template-columns: 1fr !important; }
+  .dividend-person-row { flex-direction: column !important; }
 }
 
 /* ── SYNC ── */
@@ -448,6 +466,8 @@ html, body {
       <div class="nav-chip" data-tab="project">📁 프로젝트</div>
       <div class="nav-chip" data-tab="routine">🔄 루틴</div>
       <div class="nav-chip" data-tab="note">📝 노트</div>
+      <div class="nav-chip" data-tab="ledger">💰 가계부</div>
+      <div class="nav-chip" data-tab="dividend">📈 배당내역</div>
       <div class="nav-chip" data-tab="lifeclock">⏳ 인생시계</div>
     </div>
     <div class="sync-btn" id="sync-btn" onclick="openSyncModal()" title="기기 간 동기화"><span class="sync-dot" id="sync-dot"></span><span id="sync-btn-label">동기화</span></div>
@@ -544,12 +564,76 @@ html, body {
     </div>
     <textarea id="nd-content" class="modal-textarea" rows="6" placeholder="노트 내용을 입력하세요..."></textarea>
     <div class="modal-btns" style="margin-top:12px">
+      <span onclick="deleteNoteFromDetail()" style="color:#f87171;font-size:13px;cursor:pointer;padding:9px 4px;margin-right:auto">삭제</span>
       <button class="btn-cancel" onclick="closeNoteDetail()">닫기</button>
       <button class="btn-save" onclick="saveNoteDetail()">저장</button>
     </div>
   </div>
 </div>
 <!-- 프로젝트 추가 모달 -->
+<!-- 가계부 내역 추가 모달 -->
+<div class="modal-overlay" id="ledger-modal">
+  <div class="modal">
+    <h3 id="ledger-modal-title">💰 내역 추가</h3>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button id="lg-type-expense" onclick="setLedgerType('expense')" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border2);background:rgba(248,113,113,0.15);color:#f87171;font-family:inherit;font-size:13px;cursor:pointer;font-weight:600">지출</button>
+      <button id="lg-type-income" onclick="setLedgerType('income')" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:inherit;font-size:13px;cursor:pointer">수입</button>
+    </div>
+    <input type="date" class="modal-textarea" id="lg-date" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px;color-scheme:dark">
+    <input class="modal-textarea" id="lg-desc" placeholder="내용 (예: 점심 식사)" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+    <input type="number" class="modal-textarea" id="lg-amount" placeholder="금액 (원)" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+    <select id="lg-category" class="modal-textarea" style="min-height:auto;padding:13px 14px;font-size:14px" onchange="handleLgCategoryChange()"></select>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeLedgerModal()">취소</button>
+      <button class="btn-save" id="ledger-save-btn" onclick="saveLedgerEntry()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- 반복 지출/수입 관리 모달 -->
+<div class="modal-overlay" id="recurring-modal">
+  <div class="modal modal-wide">
+    <h3>🔁 반복 지출/수입 관리</h3>
+    <div id="rc-list" style="max-height:160px;overflow-y:auto;margin-bottom:12px"></div>
+    <div style="border-top:1px solid var(--border);padding-top:12px">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px">새 반복 항목 추가</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button id="rc-type-expense" onclick="rcSetType('expense')" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border2);background:rgba(248,113,113,0.15);color:#f87171;font-family:inherit;font-size:12px;cursor:pointer">지출</button>
+        <button id="rc-type-income" onclick="rcSetType('income')" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:inherit;font-size:12px;cursor:pointer">수입</button>
+      </div>
+      <input class="modal-textarea" id="rc-desc" placeholder="내용 (예: 월세)" style="min-height:auto;padding:11px 13px;font-size:13px;margin-bottom:8px">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input type="number" class="modal-textarea" id="rc-amount" placeholder="금액" style="min-height:auto;padding:11px 13px;font-size:13px;flex:2">
+        <input type="number" class="modal-textarea" id="rc-day" placeholder="매월 며칠" min="1" max="28" value="1" style="min-height:auto;padding:11px 13px;font-size:13px;flex:1">
+      </div>
+      <select id="rc-category" class="modal-textarea" style="min-height:auto;padding:11px 13px;font-size:13px;margin-bottom:8px"></select>
+      <button class="btn-sync-action" onclick="addRecurring()" style="width:100%">+ 반복 항목 추가</button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeRecurringModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 배당 종목 추가 모달 -->
+<div class="modal-overlay" id="dividend-modal">
+  <div class="modal">
+    <h3 id="dividend-modal-title">📈 배당 기록 추가</h3>
+    <input type="month" class="modal-textarea" id="dv-month" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px;color-scheme:dark">
+    <select id="dv-person" class="modal-textarea" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+      <option value="진범">진범</option>
+      <option value="소연">소연</option>
+    </select>
+    <input class="modal-textarea" id="dv-stock" placeholder="종목명 (예: SCHD)" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+    <input type="number" class="modal-textarea" id="dv-shares" placeholder="보유 주수 (선택)" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+    <input type="number" class="modal-textarea" id="dv-amount" placeholder="이번 달 받은 금액 (원)" style="min-height:auto;padding:13px 14px;font-size:14px">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeDividendModal()">취소</button>
+      <button class="btn-save" id="dividend-save-btn" onclick="saveDividendEntry()">추가</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="project-add-modal">
   <div class="modal">
     <h3>📁 새 프로젝트</h3>
@@ -1049,7 +1133,10 @@ initWeather();
 // ── LOCALSTORAGE KEYS ──
 const LS = {
   tasks: 'ff_tasks', goals: 'ff_goals', projects: 'ff_projects',
-  habits: 'ff_habits', notes: 'ff_notes', weekTasks: 'ff_week', memo: 'ff_memo'
+  habits: 'ff_habits', notes: 'ff_notes', weekTasks: 'ff_week', memo: 'ff_memo',
+  ledger: 'ff_ledger', dividends: 'ff_dividends', dividendGoal: 'ff_dividend_goal',
+  ledgerCustomCats: 'ff_ledger_custom_cats', ledgerRecurring: 'ff_ledger_recurring',
+  ledgerRecurringApplied: 'ff_ledger_recurring_applied'
 };
 function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); syncScheduleAutoUpload(); } catch(e){} }
 function load(key, def) { try { const v=localStorage.getItem(key); return v?JSON.parse(v):def; } catch(e){ return def; } }
@@ -1058,7 +1145,7 @@ function load(key, def) { try { const v=localStorage.getItem(key); return v?JSON
 // ── GITHUB 동기화 모듈 (자동) ──
 // 동기화 대상 데이터 키 (실제 콘텐츠 데이터만, 인증정보는 별도 저장)
 // ════════════════════════════════════════════════════════════
-const SYNC_DATA_KEYS = ['ff_tasks','ff_goals','ff_projects','ff_habits','ff_notes','ff_week','ff_memo','ff_manual_location'];
+const SYNC_DATA_KEYS = ['ff_tasks','ff_goals','ff_projects','ff_habits','ff_notes','ff_week','ff_memo','ff_manual_location','ff_ledger','ff_dividends','ff_dividend_goal','ff_ledger_custom_cats','ff_ledger_recurring','ff_ledger_recurring_applied'];
 const SYNC_CFG_KEY = 'ff_sync_cfg'; // {token, owner, repo} — 이 기기에만 저장됨
 const SYNC_FILE_PATH = 'focusflow-data.json';
 const SYNC_DEBOUNCE_MS = 2500; // 마지막 수정 후 이 시간만큼 조작이 없으면 자동 업로드
@@ -1264,6 +1351,10 @@ function renderAllAfterSync() {
     notes = load(LS.notes, notes);
     weekTasksAll = load(LS.weekTasks, weekTasksAll);
     memoText = load(LS.memo, memoText);
+    ledgerEntries = load(LS.ledger, ledgerEntries);
+    dividendEntries = load(LS.dividends, dividendEntries);
+    ledgerCustomCategories = load(LS.ledgerCustomCats, ledgerCustomCategories);
+    ledgerRecurring = load(LS.ledgerRecurring, ledgerRecurring);
     if (typeof renderTasks === 'function') renderTasks();
     if (typeof renderGoals === 'function') renderGoals();
     if (typeof renderTab === 'function') renderTab(document.querySelector('.nav-chip.active')?.dataset.tab || 'daily');
@@ -1335,6 +1426,134 @@ let notes = load(LS.notes, [
   {id:5,icon:'🎨',title:'콘텐츠 아이디어',count:4,tag:'아이디어',tagColor:'#a78bfa',updated:'3일 전',content:''},
   {id:6,icon:'✍️',title:'일기',count:30,tag:'개인',tagColor:'#f87171',updated:'어제',content:''},
 ]);
+
+// ── 가계부 ──
+// 구조: {id, date:'YYYY-MM-DD', desc, amount(양수=금액), type:'income'|'expense', category}
+let ledgerEntries = load(LS.ledger, []);
+const LEDGER_DEFAULT_CATEGORIES = {
+  income: [
+    {key:'salary', label:'급여', color:'#4ade80'},
+    {key:'dividend', label:'배당/이자', color:'#60a5fa'},
+    {key:'other_income', label:'기타수입', color:'#a78bfa'},
+  ],
+  expense: [
+    {key:'food', label:'식비', color:'#fb923c'},
+    {key:'transport', label:'교통', color:'#60a5fa'},
+    {key:'housing', label:'주거/통신', color:'#f472b6'},
+    {key:'shopping', label:'쇼핑', color:'#a78bfa'},
+    {key:'medical', label:'의료', color:'#4ade80'},
+    {key:'etc', label:'기타', color:'#94a3b8'},
+  ]
+};
+const LEDGER_CUSTOM_COLORS = ['#f0b86e','#7fc8e8','#fb7185','#34d399','#c084fc','#facc15'];
+let ledgerCustomCategories = load(LS.ledgerCustomCats, { income: [], expense: [] });
+function ledgerSaveCustomCategories() { save(LS.ledgerCustomCats, ledgerCustomCategories); }
+function ledgerAllCategories(type) { return [...LEDGER_DEFAULT_CATEGORIES[type], ...ledgerCustomCategories[type]]; }
+function ledgerCategoryInfo(key) {
+  const all = [...ledgerAllCategories('income'), ...ledgerAllCategories('expense')];
+  return all.find(c=>c.key===key) || {key:'etc', label:'기타', color:'#94a3b8'};
+}
+function ledgerAddCustomCategory(type, label) {
+  const key = 'custom_' + Date.now();
+  const color = LEDGER_CUSTOM_COLORS[ledgerCustomCategories[type].length % LEDGER_CUSTOM_COLORS.length];
+  ledgerCustomCategories[type].push({ key, label, color });
+  ledgerSaveCustomCategories();
+  return key;
+}
+function ledgerMonthKey(dateStr) { return dateStr.slice(0,7); } // 'YYYY-MM'
+function ledgerYearKey(dateStr) { return dateStr.slice(0,4); } // 'YYYY'
+function ledgerCurrentMonthKey() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
+}
+function ledgerMonthLabel(mk) { const [y,m] = mk.split('-'); return `${y}년 ${parseInt(m,10)}월`; }
+function ledgerPrevMonthKey(mk) {
+  const [y,m] = mk.split('-').map(Number);
+  const d = new Date(y, m-2, 1); // m은 1-indexed라 -2
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function ledgerNextMonthKey(mk) {
+  const [y,m] = mk.split('-').map(Number);
+  const d = new Date(y, m, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+let ledgerViewMonth = ledgerCurrentMonthKey(); // 가계부 탭에서 현재 보고 있는 달
+let ledgerEditId = null; // 수정 중인 항목 id (null이면 새로 추가)
+
+// ── 가계부 반복 지출/수입 ──
+// 구조: {id, desc, amount, type, category, day(매월 며칠), active}
+let ledgerRecurring = load(LS.ledgerRecurring, []);
+function ledgerApplyRecurringForMonth(mk) {
+  // 이 달에 아직 적용 안 된 반복 항목들을 자동으로 생성
+  const applied = load(LS.ledgerRecurringApplied, {}); // { 'YYYY-MM': [recurringId,...] }
+  if (!applied[mk]) applied[mk] = [];
+  let changed = false;
+  ledgerRecurring.filter(r=>r.active).forEach(r => {
+    if (applied[mk].includes(r.id)) return;
+    const [y,m] = mk.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const day = Math.min(r.day, lastDay);
+    const date = `${mk}-${String(day).padStart(2,'0')}`;
+    ledgerEntries.push({ id: Date.now()+Math.floor(Math.random()*1000), date, desc: r.desc, amount: r.amount, type: r.type, category: r.category, fromRecurring: r.id });
+    applied[mk].push(r.id);
+    changed = true;
+  });
+  if (changed) { save(LS.ledger, ledgerEntries); save(LS.ledgerRecurringApplied, applied); }
+}
+
+// ── 배당내역 ──
+// 구조: {id, month:'YYYY-MM', person:'진범'|'소연', stock:종목명, shares:보유주수, amount:이번달 받은 금액(원)}
+let dividendEntries = load(LS.dividends, []);
+const DIV_PEOPLE = ['진범','소연'];
+function dividendCurrentMonthKey() { return ledgerCurrentMonthKey(); }
+let dividendViewMonth = dividendCurrentMonthKey(); // 배당내역 탭에서 현재 보고 있는 달
+let dividendEditId = null;
+function dividendPrevMonthKey(mk) { return ledgerPrevMonthKey(mk); }
+function dividendNextMonthKey(mk) { return ledgerNextMonthKey(mk); }
+function dividendMonthLabel(mk) { return ledgerMonthLabel(mk); }
+function dividendYearKey(mk) { return mk.slice(0,4); }
+
+// ── 목표 월 배당 ──
+let dividendGoal = load(LS.dividendGoal, 0); // 0이면 미설정
+function saveDividendGoal(val) { dividendGoal = val; save(LS.dividendGoal, val); }
+
+// ── 가계부+배당 통합 ──
+function combinedNetForMonth(mk) {
+  const ledgerIncome = ledgerEntries.filter(e=>ledgerMonthKey(e.date)===mk && e.type==='income').reduce((s,e)=>s+e.amount,0);
+  const ledgerExpense = ledgerEntries.filter(e=>ledgerMonthKey(e.date)===mk && e.type==='expense').reduce((s,e)=>s+e.amount,0);
+  const divTotal = dividendEntries.filter(d=>d.month===mk).reduce((s,d)=>s+d.amount,0);
+  return { ledgerIncome, ledgerExpense, divTotal, net: ledgerIncome + divTotal - ledgerExpense };
+}
+
+// ── CSV 내보내기 ──
+function downloadCsv(filename, rows) {
+  const csv = rows.map(r => r.map(v => {
+    const s = String(v ?? '');
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function exportLedgerCsv() {
+  const rows = [['날짜','구분','카테고리','내용','금액']];
+  [...ledgerEntries].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>{
+    rows.push([e.date, e.type==='income'?'수입':'지출', ledgerCategoryInfo(e.category).label, e.desc||'', e.amount]);
+  });
+  downloadCsv('가계부_전체내역.csv', rows);
+}
+function exportDividendCsv() {
+  const rows = [['월','보유자','종목','주수','받은금액']];
+  [...dividendEntries].sort((a,b)=>a.month.localeCompare(b.month)).forEach(d=>{
+    rows.push([d.month, d.person, d.stock, d.shares||0, d.amount]);
+  });
+  downloadCsv('배당내역_전체.csv', rows);
+}
+
+
 
 // ── 주간 플래너: 주차별 데이터 구조 ──
 // 구조: { "2026-06-22": { "월": [...], "화": [...], ... }, "2026-06-29": {...} }
@@ -1469,17 +1688,277 @@ function focusTask() {
 function renderGoals() {
   const el = document.getElementById('goal-list');
   if(!el) return;
-  el.innerHTML = goals.length ? goals.map(g=>`
-    <div class="goal-item">
+  if(!goals.length) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:12px 0;text-align:center">목표를 추가해 보세요 🎯</div>';
+    return;
+  }
+  el.innerHTML = goals.map(g=>`
+    <div class="goal-item" draggable="true" data-id="${g.id}">
+      <div class="goal-drag-handle" title="드래그해서 순서 변경">
+        <span></span><span></span><span></span>
+      </div>
       <div class="goal-dot" style="background:${g.color};box-shadow:0 0 6px ${g.color}66;flex-shrink:0"></div>
       <span style="flex:1;font-size:13px">${g.text}</span>
-      <span onclick="event.stopPropagation();deleteGoal(${g.id})" style="color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;line-height:1">×</span>
-    </div>`) .join('') : '<div style="color:var(--text3);font-size:13px;padding:12px 0;text-align:center">목표를 추가해 보세요 🎯</div>';
+      <span onclick="event.stopPropagation();deleteGoal(${g.id})" style="color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;line-height:1;opacity:0;transition:opacity 0.15s" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--text3)'" class="goal-del-btn">×</span>
+    </div>`).join('');
+
+  // hover로 × 버튼 표시
+  el.querySelectorAll('.goal-item').forEach(item => {
+    item.addEventListener('mouseenter', () => { item.querySelector('.goal-del-btn').style.opacity='1'; });
+    item.addEventListener('mouseleave', () => { item.querySelector('.goal-del-btn').style.opacity='0'; });
+  });
+
+  // 드래그 앤 드롭
+  let dragId = null;
+  el.querySelectorAll('.goal-item').forEach(item => {
+    item.addEventListener('dragstart', e => {
+      dragId = Number(item.dataset.id);
+      setTimeout(() => item.classList.add('dragging'), 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      el.querySelectorAll('.goal-item').forEach(i => i.classList.remove('drag-over'));
+    });
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      el.querySelectorAll('.goal-item').forEach(i => i.classList.remove('drag-over'));
+      if(Number(item.dataset.id) !== dragId) item.classList.add('drag-over');
+    });
+    item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      item.classList.remove('drag-over');
+      const toId = Number(item.dataset.id);
+      if(dragId === toId) return;
+      const fromIdx = goals.findIndex(g=>g.id===dragId);
+      const toIdx   = goals.findIndex(g=>g.id===toId);
+      if(fromIdx<0||toIdx<0) return;
+      const [moved] = goals.splice(fromIdx, 1);
+      goals.splice(toIdx, 0, moved);
+      save(LS.goals, goals);
+      renderGoals();
+    });
+  });
 }
 
 function deleteGoal(id) {
   const i = goals.findIndex(g=>g.id===id);
   if(i>-1) { goals.splice(i,1); save(LS.goals,goals); renderGoals(); }
+}
+
+function deleteNote(id) {
+  const i = notes.findIndex(n=>n.id===id);
+  if(i>-1) { notes.splice(i,1); save(LS.notes,notes); if(currentTab==='note') renderTab('note'); }
+}
+function deleteNoteFromDetail() {
+  if(openNoteId==null) return;
+  deleteNote(openNoteId);
+  closeNoteDetail();
+}
+
+// ── 가계부 모달 ──
+let ledgerCurrentType = 'expense';
+function setLedgerType(type) {
+  ledgerCurrentType = type;
+  const exBtn = document.getElementById('lg-type-expense');
+  const inBtn = document.getElementById('lg-type-income');
+  if (type === 'expense') {
+    exBtn.style.background = 'rgba(248,113,113,0.15)'; exBtn.style.color = '#f87171'; exBtn.style.fontWeight = '600';
+    inBtn.style.background = 'transparent'; inBtn.style.color = 'var(--text2)'; inBtn.style.fontWeight = '400';
+  } else {
+    inBtn.style.background = 'rgba(74,222,128,0.15)'; inBtn.style.color = '#4ade80'; inBtn.style.fontWeight = '600';
+    exBtn.style.background = 'transparent'; exBtn.style.color = 'var(--text2)'; exBtn.style.fontWeight = '400';
+  }
+  populateLedgerCategorySelect();
+}
+function populateLedgerCategorySelect(selectedKey) {
+  const sel = document.getElementById('lg-category');
+  const list = ledgerAllCategories(ledgerCurrentType);
+  sel.innerHTML = list.map(c=>`<option value="${c.key}">${c.label}</option>`).join('')
+    + `<option value="__new__">+ 새 카테고리 만들기</option>`;
+  if (selectedKey) sel.value = selectedKey;
+}
+function handleLgCategoryChange() {
+  const sel = document.getElementById('lg-category');
+  if (sel.value === '__new__') {
+    const label = prompt('새 카테고리 이름을 입력하세요');
+    if (label && label.trim()) {
+      const key = ledgerAddCustomCategory(ledgerCurrentType, label.trim());
+      populateLedgerCategorySelect(key);
+    } else {
+      sel.value = ledgerAllCategories(ledgerCurrentType)[0]?.key || '';
+    }
+  }
+}
+function todayStr() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+}
+function openLedgerModal(editId) {
+  ledgerEditId = editId || null;
+  const modalTitle = document.getElementById('ledger-modal-title');
+  const saveBtn = document.getElementById('ledger-save-btn');
+  if (ledgerEditId) {
+    const e = ledgerEntries.find(x=>x.id===ledgerEditId);
+    document.getElementById('lg-date').value = e.date;
+    document.getElementById('lg-desc').value = e.desc || '';
+    document.getElementById('lg-amount').value = e.amount;
+    setLedgerType(e.type);
+    populateLedgerCategorySelect(e.category);
+    modalTitle.textContent = '💰 내역 수정';
+    saveBtn.textContent = '수정';
+  } else {
+    document.getElementById('lg-date').value = todayStr();
+    document.getElementById('lg-desc').value = '';
+    document.getElementById('lg-amount').value = '';
+    setLedgerType('expense');
+    modalTitle.textContent = '💰 내역 추가';
+    saveBtn.textContent = '추가';
+  }
+  document.getElementById('ledger-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('lg-desc').focus(),100);
+}
+function closeLedgerModal() { document.getElementById('ledger-modal').classList.remove('open'); ledgerEditId = null; }
+function saveLedgerEntry() {
+  const date = document.getElementById('lg-date').value || todayStr();
+  const desc = document.getElementById('lg-desc').value.trim();
+  const amount = parseFloat(document.getElementById('lg-amount').value);
+  const category = document.getElementById('lg-category').value;
+  if (!amount || amount <= 0) { document.getElementById('lg-amount').focus(); return; }
+  if (ledgerEditId) {
+    const e = ledgerEntries.find(x=>x.id===ledgerEditId);
+    if (e) { e.date = date; e.desc = desc; e.amount = amount; e.type = ledgerCurrentType; e.category = category; }
+  } else {
+    ledgerEntries.push({ id: Date.now(), date, desc, amount, type: ledgerCurrentType, category });
+  }
+  save(LS.ledger, ledgerEntries);
+  closeLedgerModal();
+  ledgerViewMonth = ledgerMonthKey(date); // 입력한 날짜가 속한 달로 자동 이동
+  if (currentTab === 'ledger') renderTab('ledger');
+}
+function deleteLedgerEntry(id) {
+  const i = ledgerEntries.findIndex(e=>e.id===id);
+  if (i>-1) { ledgerEntries.splice(i,1); save(LS.ledger, ledgerEntries); if (currentTab==='ledger') renderTab('ledger'); }
+}
+function ledgerChangeMonth(dir) {
+  ledgerViewMonth = dir > 0 ? ledgerNextMonthKey(ledgerViewMonth) : ledgerPrevMonthKey(ledgerViewMonth);
+  ledgerApplyRecurringForMonth(ledgerViewMonth);
+  if (currentTab === 'ledger') renderTab('ledger');
+}
+
+// ── 반복 지출/수입 모달 ──
+function openRecurringModal() {
+  document.getElementById('rc-list').innerHTML = ledgerRecurring.length === 0
+    ? `<div style="font-size:12px;color:var(--text3);padding:8px 0">등록된 반복 항목이 없어요</div>`
+    : ledgerRecurring.map(r=>{ const info = ledgerCategoryInfo(r.category); return `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="min-width:0">
+        <div style="font-size:13px;color:var(--text)">${r.desc} <span style="color:var(--text3);font-size:11px">매월 ${r.day}일</span></div>
+        <div style="font-size:11px;color:var(--text2)">${info.label} · ${r.type==='income'?'+':'-'}${r.amount.toLocaleString()}원</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);cursor:pointer">
+          <input type="checkbox" ${r.active?'checked':''} onchange="toggleRecurring(${r.id})"> 활성
+        </label>
+        <span onclick="deleteRecurring(${r.id})" style="color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--text3)'">×</span>
+      </div>
+    </div>`; }).join('');
+  document.getElementById('rc-desc').value = '';
+  document.getElementById('rc-amount').value = '';
+  document.getElementById('rc-day').value = '1';
+  rcSetType('expense');
+  document.getElementById('recurring-modal').classList.add('open');
+}
+function closeRecurringModal() { document.getElementById('recurring-modal').classList.remove('open'); }
+let rcCurrentType = 'expense';
+function rcSetType(type) {
+  rcCurrentType = type;
+  const exBtn = document.getElementById('rc-type-expense');
+  const inBtn = document.getElementById('rc-type-income');
+  if (type === 'expense') {
+    exBtn.style.background = 'rgba(248,113,113,0.15)'; exBtn.style.color = '#f87171';
+    inBtn.style.background = 'transparent'; inBtn.style.color = 'var(--text2)';
+  } else {
+    inBtn.style.background = 'rgba(74,222,128,0.15)'; inBtn.style.color = '#4ade80';
+    exBtn.style.background = 'transparent'; exBtn.style.color = 'var(--text2)';
+  }
+  const sel = document.getElementById('rc-category');
+  sel.innerHTML = ledgerAllCategories(type).map(c=>`<option value="${c.key}">${c.label}</option>`).join('');
+}
+function addRecurring() {
+  const desc = document.getElementById('rc-desc').value.trim();
+  const amount = parseFloat(document.getElementById('rc-amount').value);
+  const day = Math.min(28, Math.max(1, parseInt(document.getElementById('rc-day').value) || 1));
+  const category = document.getElementById('rc-category').value;
+  if (!desc || !amount || amount <= 0) return;
+  ledgerRecurring.push({ id: Date.now(), desc, amount, day, category, type: rcCurrentType, active: true });
+  save(LS.ledgerRecurring, ledgerRecurring);
+  openRecurringModal(); // 목록 새로고침
+}
+function toggleRecurring(id) {
+  const r = ledgerRecurring.find(x=>x.id===id);
+  if (r) { r.active = !r.active; save(LS.ledgerRecurring, ledgerRecurring); }
+}
+function deleteRecurring(id) {
+  const i = ledgerRecurring.findIndex(x=>x.id===id);
+  if (i>-1) { ledgerRecurring.splice(i,1); save(LS.ledgerRecurring, ledgerRecurring); openRecurringModal(); }
+}
+
+// ── 배당내역 모달 (월 + 보유자 + 종목 + 받은 금액) ──
+function openDividendModal(editId) {
+  dividendEditId = editId || null;
+  const modalTitle = document.getElementById('dividend-modal-title');
+  const saveBtn = document.getElementById('dividend-save-btn');
+  if (dividendEditId) {
+    const d = dividendEntries.find(x=>x.id===dividendEditId);
+    document.getElementById('dv-month').value = d.month;
+    document.getElementById('dv-person').value = d.person;
+    document.getElementById('dv-stock').value = d.stock;
+    document.getElementById('dv-shares').value = d.shares || '';
+    document.getElementById('dv-amount').value = d.amount;
+    modalTitle.textContent = '📈 배당 기록 수정';
+    saveBtn.textContent = '수정';
+  } else {
+    document.getElementById('dv-month').value = dividendViewMonth;
+    document.getElementById('dv-person').value = DIV_PEOPLE[0];
+    document.getElementById('dv-stock').value = '';
+    document.getElementById('dv-shares').value = '';
+    document.getElementById('dv-amount').value = '';
+    modalTitle.textContent = '📈 배당 기록 추가';
+    saveBtn.textContent = '추가';
+  }
+  document.getElementById('dividend-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('dv-stock').focus(),100);
+}
+function closeDividendModal() { document.getElementById('dividend-modal').classList.remove('open'); dividendEditId = null; }
+function saveDividendEntry() {
+  const month = document.getElementById('dv-month').value || dividendViewMonth;
+  const person = document.getElementById('dv-person').value;
+  const stock = document.getElementById('dv-stock').value.trim();
+  const shares = parseFloat(document.getElementById('dv-shares').value);
+  const amount = parseFloat(document.getElementById('dv-amount').value);
+  if (!stock) { document.getElementById('dv-stock').focus(); return; }
+  if (!amount || amount <= 0) { document.getElementById('dv-amount').focus(); return; }
+  if (dividendEditId) {
+    const d = dividendEntries.find(x=>x.id===dividendEditId);
+    if (d) { d.month = month; d.person = person; d.stock = stock; d.shares = shares||0; d.amount = amount; }
+  } else {
+    dividendEntries.push({ id: Date.now(), month, person, stock, shares: shares||0, amount });
+  }
+  save(LS.dividends, dividendEntries);
+  closeDividendModal();
+  dividendViewMonth = month; // 입력한 달로 자동 이동
+  if (currentTab === 'dividend') renderTab('dividend');
+}
+function deleteDividendEntry(id) {
+  const i = dividendEntries.findIndex(d=>d.id===id);
+  if (i>-1) { dividendEntries.splice(i,1); save(LS.dividends, dividendEntries); if (currentTab==='dividend') renderTab('dividend'); }
+}
+function dividendChangeMonth(dir) {
+  dividendViewMonth = dir > 0 ? dividendNextMonthKey(dividendViewMonth) : dividendPrevMonthKey(dividendViewMonth);
+  if (currentTab === 'dividend') renderTab('dividend');
 }
 
 // ── GOAL MODAL ──
@@ -1854,12 +2333,13 @@ function tabHTML(tab) {
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">
         ${notes.map(n=>`
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all 0.2s"
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all 0.2s;position:relative"
           onmouseover="this.style.borderColor='var(--border2)';this.style.transform='translateY(-2px)'"
           onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'"
           onclick="openNoteDetail(${n.id})">
+          <span onclick="event.stopPropagation();deleteNote(${n.id})" style="position:absolute;top:10px;right:10px;color:var(--text3);cursor:pointer;font-size:16px;padding:2px 6px;line-height:1;border-radius:6px;transition:color 0.15s,background 0.15s" onmouseover="this.style.color='#f87171';this.style.background='rgba(248,113,113,0.12)'" onmouseout="this.style.color='var(--text3)';this.style.background='transparent'">×</span>
           <div style="font-size:24px;margin-bottom:8px">${n.icon}</div>
-          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:6px;word-break:keep-all">${n.title}</div>
+          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:6px;word-break:keep-all;padding-right:18px">${n.title}</div>
           <div style="font-size:11px;color:var(--text2);margin-bottom:8px;min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.content ? n.content.slice(0,40).replace(/\n/g,' ') : '내용 없음'}</div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
             <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${n.tagColor}18;color:${n.tagColor};border:1px solid ${n.tagColor}33">${n.tag}</span>
@@ -1868,6 +2348,314 @@ function tabHTML(tab) {
         </div>`).join('')}
       </div>
     </div>`;
+
+  if(tab==='ledger') {
+    ledgerApplyRecurringForMonth(ledgerViewMonth);
+    const mk = ledgerViewMonth;
+    const prevMk = ledgerPrevMonthKey(mk);
+    const monthEntries = ledgerEntries.filter(e=>ledgerMonthKey(e.date)===mk);
+    const prevMonthEntries = ledgerEntries.filter(e=>ledgerMonthKey(e.date)===prevMk);
+    const totalIncome = monthEntries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+    const totalExpense = monthEntries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    const prevTotalExpense = prevMonthEntries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    const net = totalIncome - totalExpense;
+    const divThisMonth = dividendEntries.filter(d=>d.month===mk).reduce((s,d)=>s+d.amount,0);
+    const combinedNet = net + divThisMonth;
+
+    // 전월 대비 지출 증감
+    let diffHtml = '';
+    if (prevTotalExpense > 0) {
+      const diff = totalExpense - prevTotalExpense;
+      const pct = Math.round(diff / prevTotalExpense * 100);
+      const up = diff > 0;
+      const color = up ? '#f87171' : '#4ade80';
+      const arrow = up ? '▲' : (diff < 0 ? '▼' : '–');
+      diffHtml = `<span style="font-size:12px;color:${color};margin-left:8px">${arrow} 전월 대비 ${Math.abs(pct)}%</span>`;
+    } else if (totalExpense > 0) {
+      diffHtml = `<span style="font-size:12px;color:var(--text2);margin-left:8px">전월 데이터 없음</span>`;
+    }
+
+    // 카테고리별 지출 합계 (지출만)
+    const catTotals = {};
+    monthEntries.filter(e=>e.type==='expense').forEach(e=>{ catTotals[e.category] = (catTotals[e.category]||0) + e.amount; });
+    const catRows = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+    const maxCat = catRows.length ? catRows[0][1] : 1;
+
+    // 최근 6개월 지출 추이
+    const trendMonths = [];
+    let cursor = mk;
+    for (let i=0;i<6;i++) { trendMonths.unshift(cursor); cursor = ledgerPrevMonthKey(cursor); }
+    const trendData = trendMonths.map(m => ({
+      month: m,
+      expense: ledgerEntries.filter(e=>ledgerMonthKey(e.date)===m && e.type==='expense').reduce((s,e)=>s+e.amount,0)
+    }));
+    const maxTrend = Math.max(1, ...trendData.map(t=>t.expense));
+
+    // 연간 누적 통계
+    const yk = ledgerYearKey(mk + '-01');
+    const yearEntries = ledgerEntries.filter(e=>ledgerYearKey(e.date)===yk);
+    const yearIncome = yearEntries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+    const yearExpense = yearEntries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    const yearDiv = dividendEntries.filter(d=>dividendYearKey(d.month)===yk).reduce((s,d)=>s+d.amount,0);
+
+    const monthEntriesSorted = [...monthEntries].sort((a,b)=> b.date.localeCompare(a.date) || b.id-a.id );
+    const isCurrentMonth = mk === ledgerCurrentMonthKey();
+
+    return `
+    <div class="content-block" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="ledgerChangeMonth(-1)" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:13px">‹</button>
+          <div class="block-title" style="margin-bottom:0">💰 가계부 · ${ledgerMonthLabel(mk)}${isCurrentMonth?' <span style="color:var(--accent);font-size:10px;font-weight:400">(이번 달)</span>':''}</div>
+          <button onclick="ledgerChangeMonth(1)" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:13px">›</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onclick="openRecurringModal()" style="font-size:12px;padding:7px 12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);border-radius:8px;cursor:pointer">🔁 반복관리</button>
+          <button onclick="exportLedgerCsv()" style="font-size:12px;padding:7px 12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);border-radius:8px;cursor:pointer">⬇ CSV</button>
+          <button class="task-add-btn" style="font-size:13px;padding:7px 14px" onclick="openLedgerModal()">+ 내역 추가</button>
+        </div>
+      </div>
+      <div class="ledger-summary-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">수입</div>
+          <div style="font-size:18px;font-weight:600;color:#4ade80">+${totalIncome.toLocaleString()}원</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">지출</div>
+          <div style="font-size:18px;font-weight:600;color:#f87171">-${totalExpense.toLocaleString()}원${diffHtml}</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">순잔액</div>
+          <div style="font-size:18px;font-weight:600;color:${net>=0?'var(--accent2)':'#f87171'}">${net>=0?'+':''}${net.toLocaleString()}원</div>
+        </div>
+      </div>
+      <div style="background:rgba(127,200,232,0.08);border:1px solid rgba(127,200,232,0.25);border-radius:10px;padding:10px 12px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;color:var(--text2)">💰 가계부 순잔액 + 📈 이번 달 배당(${divThisMonth.toLocaleString()}원) 포함</span>
+        <span style="font-size:15px;font-weight:600;color:${combinedNet>=0?'var(--accent2)':'#f87171'}">${combinedNet>=0?'+':''}${combinedNet.toLocaleString()}원</span>
+      </div>
+
+      <div style="margin-bottom:18px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">최근 6개월 지출 추이</div>
+        <div style="display:flex;align-items:flex-end;gap:8px;height:90px">
+          ${trendData.map(t=>`
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:4px">
+            <div style="font-size:9px;color:var(--text3)">${t.expense>0?Math.round(t.expense/1000)+'k':''}</div>
+            <div style="width:100%;max-width:32px;height:${Math.max(2,Math.round(t.expense/maxTrend*60))}px;background:${t.month===mk?'var(--accent)':'rgba(240,184,110,0.3)'};border-radius:4px 4px 0 0;transition:height 0.3s"></div>
+            <div style="font-size:9px;color:${t.month===mk?'var(--text)':'var(--text3)'}">${t.month.slice(5)}월</div>
+          </div>`).join('')}
+        </div>
+      </div>
+
+      ${catRows.length ? `
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">카테고리별 지출</div>
+        ${catRows.map(([key,amt])=>{ const info = ledgerCategoryInfo(key); return `
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span style="color:var(--text)">${info.label}</span>
+            <span style="color:var(--text2)">${amt.toLocaleString()}원</span>
+          </div>
+          <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
+            <div style="width:${Math.round(amt/maxCat*100)}%;height:100%;background:${info.color};border-radius:3px"></div>
+          </div>
+        </div>`; }).join('')}
+      </div>` : ''}
+
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">${yk}년 누적</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div><span style="font-size:11px;color:var(--text2)">수입 </span><span style="font-size:13px;font-weight:600;color:#4ade80">${yearIncome.toLocaleString()}원</span></div>
+          <div><span style="font-size:11px;color:var(--text2)">지출 </span><span style="font-size:13px;font-weight:600;color:#f87171">${yearExpense.toLocaleString()}원</span></div>
+          <div><span style="font-size:11px;color:var(--text2)">배당 </span><span style="font-size:13px;font-weight:600;color:var(--accent)">${yearDiv.toLocaleString()}원</span></div>
+        </div>
+      </div>
+
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">${ledgerMonthLabel(mk)} 내역</div>
+      <div style="max-height:320px;overflow-y:auto">
+        ${monthEntriesSorted.length===0 ? `<div style="font-size:13px;color:var(--text3);text-align:center;padding:20px 0">이 달엔 등록된 내역이 없어요</div>` : monthEntriesSorted.map(e=>{ const info = ledgerCategoryInfo(e.category); return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer" onclick="openLedgerModal(${e.id})">
+            <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${info.color}18;color:${info.color};border:1px solid ${info.color}33;flex-shrink:0">${info.label}</span>
+            <div style="min-width:0">
+              <div style="font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.desc||'(내용 없음)'}${e.fromRecurring?' <span style="color:var(--text3);font-size:10px">🔁</span>':''}</div>
+              <div style="font-size:10px;color:var(--text3)">${e.date}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+            <span style="font-size:13px;font-weight:600;color:${e.type==='income'?'#4ade80':'#f87171'}">${e.type==='income'?'+':'-'}${e.amount.toLocaleString()}원</span>
+            <span onclick="deleteLedgerEntry(${e.id})" style="color:var(--text3);cursor:pointer;font-size:15px;padding:2px 5px" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--text3)'">×</span>
+          </div>
+        </div>`; }).join('')}
+      </div>
+    </div>`;
+  }
+
+  if(tab==='dividend') {
+    const mk = dividendViewMonth;
+    const isCurrentMonth = mk === dividendCurrentMonthKey();
+    const monthEntries = dividendEntries.filter(d=>d.month===mk);
+    const totalThisMonth = monthEntries.reduce((s,d)=>s+d.amount,0);
+
+    function personBlock(person) {
+      const rows = monthEntries.filter(d=>d.person===person).sort((a,b)=>b.amount-a.amount);
+      const subtotal = rows.reduce((s,d)=>s+d.amount,0);
+      return `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${person}</div>
+          <div style="font-size:14px;font-weight:600;color:var(--accent)">${subtotal.toLocaleString()}원</div>
+        </div>
+        ${rows.length===0 ? `<div style="font-size:12px;color:var(--text3);padding:8px 0">등록된 내역 없음</div>` : rows.map(d=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--border);cursor:pointer" onclick="openDividendModal(${d.id})">
+          <div style="min-width:0">
+            <div style="font-size:13px;color:var(--text)">${d.stock}</div>
+            <div style="font-size:10px;color:var(--text3)">${d.shares.toLocaleString()}주</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span style="font-size:13px;font-weight:500;color:var(--accent2)">${d.amount.toLocaleString()}원</span>
+            <span onclick="event.stopPropagation();deleteDividendEntry(${d.id})" style="color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--text3)'">×</span>
+          </div>
+        </div>`).join('')}
+      </div>`;
+    }
+
+    // 종목별 합계 (이번 달)
+    const stockTotals = {};
+    monthEntries.forEach(d=>{ stockTotals[d.stock] = (stockTotals[d.stock]||0) + d.amount; });
+    const stockRows = Object.entries(stockTotals).sort((a,b)=>b[1]-a[1]);
+    const maxStock = stockRows.length ? stockRows[0][1] : 1;
+
+    // 연간 누적
+    const yk = dividendYearKey(mk);
+    const yearTotal = dividendEntries.filter(d=>dividendYearKey(d.month)===yk).reduce((s,d)=>s+d.amount,0);
+    const yearByPerson = DIV_PEOPLE.map(p=>({ person:p, total: dividendEntries.filter(d=>dividendYearKey(d.month)===yk && d.person===p).reduce((s,d)=>s+d.amount,0) }));
+
+    // 해당 연도 1-12월 전체 추이
+    const allMonths = Array.from({length:12}, (_,i) => `${yk}-${String(i+1).padStart(2,'0')}`);
+    const trendData = allMonths.map(m => ({ month:m, total: dividendEntries.filter(d=>d.month===m).reduce((s,d)=>s+d.amount,0) }));
+    const maxTrend = Math.max(1, ...trendData.map(t=>t.total));
+
+    return `
+    <div class="content-block" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="dividendChangeMonth(-1)" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:13px">‹</button>
+          <div class="block-title" style="margin-bottom:0">📈 배당내역 · ${dividendMonthLabel(mk)}${isCurrentMonth?' <span style="color:var(--accent);font-size:10px;font-weight:400">(이번 달)</span>':''}</div>
+          <button onclick="dividendChangeMonth(1)" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:13px">›</button>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button onclick="exportDividendCsv()" style="font-size:12px;padding:7px 12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);border-radius:8px;cursor:pointer">⬇ CSV</button>
+          <button class="task-add-btn" style="font-size:13px;padding:7px 14px" onclick="openDividendModal()">+ 배당 기록</button>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${dividendMonthLabel(mk)} 총 배당</div>
+        <div style="font-size:20px;font-weight:600;color:var(--accent)">${totalThisMonth.toLocaleString()}원</div>
+      </div>
+      <div style="margin-bottom:18px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">${yk}년 월별 배당 추이</div>
+        <div style="display:flex;align-items:flex-end;gap:2px;height:100px">
+          ${(function(){
+            return trendData.map(function(t){
+              var isCur = t.month===mk;
+              var barH = Math.max(t.total>0?3:1, Math.round(t.total/maxTrend*68));
+              var mNum = parseInt(t.month.slice(5),10);
+              var amtLabel = t.total>0 ? Math.round(t.total/10000)+'만' : '';
+              var amtColor = t.total>0 ? (isCur?'var(--text)':'var(--text3)') : 'transparent';
+              var barBg = isCur ? 'var(--accent2)' : (t.total>0 ? 'rgba(127,200,232,0.35)' : 'rgba(255,255,255,0.05)');
+              var barShadow = isCur ? 'box-shadow:0 0 8px rgba(127,200,232,0.4);' : '';
+              var lbColor = isCur ? 'var(--text)' : 'var(--text3)';
+              var lbWeight = isCur ? '600' : '400';
+              var titleTxt = mNum+'월 '+(t.total>0 ? t.total.toLocaleString()+'원' : '데이터 없음');
+              return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:3px;cursor:pointer;border-radius:4px;padding:0 1px" onclick="dividendViewMonth=\''+t.month+'\';renderTab(\'dividend\')" title="'+titleTxt+'">'
+                + '<div style="font-size:8px;color:'+amtColor+';line-height:1">'+amtLabel+'</div>'
+                + '<div style="width:100%;height:'+barH+'px;background:'+barBg+';border-radius:3px 3px 0 0;transition:all 0.25s;'+barShadow+'"></div>'
+                + '<div style="font-size:9px;color:'+lbColor+';font-weight:'+lbWeight+'">'+mNum+'월</div>'
+                + '</div>';
+            }).join('');
+          })()}
+        </div>
+      </div>
+      ${stockRows.length ? `
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">종목별 합계 (이번 달, 전체)</div>
+        ${stockRows.map(([stock,amt])=>`
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span style="color:var(--text)">${stock}</span>
+            <span style="color:var(--text2)">${amt.toLocaleString()}원</span>
+          </div>
+          <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
+            <div style="width:${Math.round(amt/maxStock*100)}%;height:100%;background:var(--accent2);border-radius:3px"></div>
+          </div>
+        </div>`).join('')}
+      </div>` : ''}
+      <div class="dividend-person-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        ${DIV_PEOPLE.map(p=>personBlock(p)).join('')}
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px;letter-spacing:0.03em">${yk}년 누적 배당</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:baseline;margin-bottom:12px">
+          <div><span style="font-size:13px;color:var(--text2)">총 </span><span style="font-size:16px;font-weight:600;color:var(--accent)">${yearTotal.toLocaleString()}원</span></div>
+          ${yearByPerson.map(p=>`<div><span style="font-size:11px;color:var(--text2)">${p.person} </span><span style="font-size:13px;font-weight:600;color:var(--text)">${p.total.toLocaleString()}원</span></div>`).join('')}
+        </div>
+        ${(()=>{
+          // 배당 기록이 있는 월 수 계산 (해당 연도)
+          const yearMonths = [...new Set(dividendEntries.filter(d=>dividendYearKey(d.month)===yk).map(d=>d.month))];
+          const monthCount = yearMonths.length;
+          const avgMonthly = monthCount > 0 ? Math.round(yearTotal / monthCount) : 0;
+          const goalVal = dividendGoal || 0;
+          // 달성률 = 월평균 ÷ 목표
+          const goalPct = goalVal > 0 && avgMonthly > 0 ? Math.min(Math.round(avgMonthly / goalVal * 100), 999) : 0;
+          const goalBarW = goalVal > 0 && avgMonthly > 0 ? Math.min(avgMonthly / goalVal * 100, 100) : 0;
+          const goalColor = goalPct >= 100 ? '#4ade80' : goalPct >= 70 ? 'var(--accent)' : 'var(--accent2)';
+
+          return `
+        <div style="border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:11px;color:var(--text2)">월 평균 배당 <span style="font-size:10px;color:var(--text3)">(${monthCount}개월 기준)</span></span>
+            <span style="font-size:14px;font-weight:600;color:var(--accent2)">${avgMonthly > 0 ? avgMonthly.toLocaleString()+'원' : '—'}</span>
+          </div>
+          ${goalVal > 0 ? `
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:11px;color:var(--text2)">월평균 달성률 <span style="font-size:10px;color:var(--text3)">(평균 ÷ 목표)</span></span>
+              <span style="font-size:13px;font-weight:600;color:${goalColor}">${goalPct}%</span>
+            </div>
+            <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden">
+              <div style="width:${goalBarW}%;height:100%;background:${goalColor};border-radius:4px;transition:width 0.4s"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px">
+              <span style="font-size:10px;color:var(--text3)">월평균 ${avgMonthly.toLocaleString()}원</span>
+              <span style="font-size:10px;color:var(--text3)">목표 ${goalVal.toLocaleString()}원</span>
+            </div>
+          </div>` : ''}
+        </div>`;
+        })()}
+      </div>
+
+      <!-- 목표 월 배당 설정 (분리된 섹션) -->
+      <div style="background:rgba(127,200,232,0.05);border:1px solid rgba(127,200,232,0.18);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:2px">🎯 목표 월 배당 설정</div>
+          <div style="font-size:10px;color:var(--text3)">월평균 배당 기준으로 달성률을 계산해요</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <input type="text"
+            id="dividend-goal-input"
+            value="${dividendGoal ? dividendGoal.toLocaleString() : ''}"
+            placeholder="예: 4,600,000"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');"
+            onchange="saveDividendGoal(Number(this.value.replace(/,/g,''))||0); renderTab('dividend');"
+            style="width:140px;background:var(--surface2);border:1px solid rgba(127,200,232,0.3);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;font-family:inherit;text-align:right;outline:none;"
+            onfocus="this.style.borderColor='var(--accent2)'"
+            onblur="this.style.borderColor='rgba(127,200,232,0.3)'"
+          >
+          <span style="font-size:12px;color:var(--text2)">원</span>
+        </div>
+      </div>
+    </div>`;
+  }
 
   if(tab==='lifeclock') return `
     <div class="content-block" style="margin-bottom:0;padding:0;overflow:hidden">
@@ -1933,7 +2721,7 @@ document.querySelectorAll('.nav-chip').forEach(el=>{
 });
 
 // ── CLOSE MODALS ON OVERLAY CLICK ──
-['memo-modal','goal-modal','note-modal','habit-modal','project-modal','note-detail-modal','project-add-modal','week-task-modal'].forEach(id=>{
+['memo-modal','goal-modal','note-modal','habit-modal','project-modal','note-detail-modal','project-add-modal','week-task-modal','ledger-modal','dividend-modal','recurring-modal'].forEach(id=>{
   const el = document.getElementById(id);
   if(el) el.addEventListener('click', function(e){ if(e.target===this) this.classList.remove('open'); });
 });
