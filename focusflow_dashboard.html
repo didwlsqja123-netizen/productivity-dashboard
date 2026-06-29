@@ -347,8 +347,8 @@ html, body {
 .btn-save:hover { background: rgba(255,255,255,0.14); }
 
 /* ── MOBILE ── */
-@media (max-width: 480px) {
-  .widget-weather { flex: 1 1 100%; padding: 12px 14px; }
+@media (max-width: 600px) {
+  .widget-weather { flex: 1 1 100%; padding: 10px 12px; }
   .widget-memo { flex: 1 1 100%; max-width: 100%; }
   .content-block { padding: 12px; }
   .task-name { font-size: 13px; }
@@ -360,33 +360,46 @@ html, body {
   .dividend-person-row { flex-direction: column !important; }
 
   /* 시계 + 날씨 위젯 축소 */
-  .weather-top { margin-bottom: 8px; }
-  .clock-mini-seg { font-size: 20px; }
-  .clock-mini-colon { font-size: 14px; }
-  .clock-mini-date { font-size: 10px; margin-top: 2px; }
-  #wtemp { font-size: 20px !important; }
-  .weather-loc-row { padding-top: 8px; }
-  .weather-location { font-size: 12px; }
+  .weather-top { margin-bottom: 6px; }
+  .clock-mini-seg { font-size: 15px !important; }
+  .clock-mini-colon { font-size: 11px !important; }
+  .clock-mini-date { font-size: 9px !important; margin-top: 1px; }
+  #wtemp { font-size: 15px !important; }
+  #wdesc { font-size: 10px !important; }
+  .weather-loc-row { padding-top: 6px; margin-bottom: 0; }
+  .weather-location { font-size: 11px !important; }
   .weather-label { display: none; }
-  .weather-forecast { padding-top: 8px; gap: 4px; }
-  .forecast-day { font-size: 10px; }
-  .forecast-day .fd-icon { font-size: 14px; margin-bottom: 2px; }
-  .forecast-day .fd-temp { font-size: 11px; }
+  .weather-forecast { padding-top: 6px; gap: 3px; }
+  .forecast-day { font-size: 9px; }
+  .forecast-day .fd-icon { font-size: 12px; margin-bottom: 1px; }
+  .forecast-day .fd-temp { font-size: 10px !important; }
+  #whumid, #wpm10, #wpm25 { font-size: 10px; }
+  div[style*="margin:10px 0"] { margin: 6px 0 !important; font-size: 10px !important; }
 
   /* 탭 네비 컴팩트화: 가로 한 줄에 더 많이 보이도록 + 줄바꿈 허용 */
-  .nav-row-wrap { flex-wrap: wrap; }
+  .nav-row-wrap {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
   .nav-row {
     flex-wrap: wrap;
     overflow-x: visible;
     gap: 6px;
-    margin: 14px 0 12px;
+    margin: 14px 0 0;
+    width: 100%;
   }
   .nav-chip {
-    padding: 7px 12px;
-    font-size: 12px;
-    border-radius: 16px;
+    padding: 6px 10px;
+    font-size: 11px;
+    border-radius: 14px;
   }
-  .sync-btn { padding: 7px 12px; font-size: 12px; margin-left: 0; }
+  .sync-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+    margin-left: 0;
+    align-self: flex-end;
+  }
 }
 
 /* ── SYNC ── */
