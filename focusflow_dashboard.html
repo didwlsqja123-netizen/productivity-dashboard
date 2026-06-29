@@ -348,7 +348,7 @@ html, body {
 
 /* ── MOBILE ── */
 @media (max-width: 480px) {
-  .widget-weather { flex: 1 1 100%; }
+  .widget-weather { flex: 1 1 100%; padding: 12px 14px; }
   .widget-memo { flex: 1 1 100%; max-width: 100%; }
   .content-block { padding: 12px; }
   .task-name { font-size: 13px; }
@@ -358,6 +358,35 @@ html, body {
   .ledger-summary-grid { grid-template-columns: 1fr !important; }
   .dividend-summary-grid { grid-template-columns: 1fr !important; }
   .dividend-person-row { flex-direction: column !important; }
+
+  /* 시계 + 날씨 위젯 축소 */
+  .weather-top { margin-bottom: 8px; }
+  .clock-mini-seg { font-size: 20px; }
+  .clock-mini-colon { font-size: 14px; }
+  .clock-mini-date { font-size: 10px; margin-top: 2px; }
+  #wtemp { font-size: 20px !important; }
+  .weather-loc-row { padding-top: 8px; }
+  .weather-location { font-size: 12px; }
+  .weather-label { display: none; }
+  .weather-forecast { padding-top: 8px; gap: 4px; }
+  .forecast-day { font-size: 10px; }
+  .forecast-day .fd-icon { font-size: 14px; margin-bottom: 2px; }
+  .forecast-day .fd-temp { font-size: 11px; }
+
+  /* 탭 네비 컴팩트화: 가로 한 줄에 더 많이 보이도록 + 줄바꿈 허용 */
+  .nav-row-wrap { flex-wrap: wrap; }
+  .nav-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 6px;
+    margin: 14px 0 12px;
+  }
+  .nav-chip {
+    padding: 7px 12px;
+    font-size: 12px;
+    border-radius: 16px;
+  }
+  .sync-btn { padding: 7px 12px; font-size: 12px; margin-left: 0; }
 }
 
 /* ── SYNC ── */
