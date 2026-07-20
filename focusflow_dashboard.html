@@ -513,6 +513,7 @@ html, body {
       <div class="nav-chip" data-tab="note">📝 노트</div>
       <div class="nav-chip" data-tab="ledger">💰 가계부</div>
       <div class="nav-chip" data-tab="dividend">📈 배당내역</div>
+      <div class="nav-chip" data-tab="invest">💹 재테크</div>
       <div class="nav-chip" data-tab="lifeclock">⏳ 인생시계</div>
     </div>
     <div class="sync-btn" id="sync-btn" onclick="openSyncModal()" title="기기 간 동기화"><span class="sync-dot" id="sync-dot"></span><span id="sync-btn-label">동기화</span></div>
@@ -675,6 +676,25 @@ html, body {
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeDividendModal()">취소</button>
       <button class="btn-save" id="dividend-save-btn" onclick="saveDividendEntry()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- 재테크(보유 종목) 추가 모달 -->
+<div class="modal-overlay" id="invest-modal">
+  <div class="modal">
+    <h3 id="invest-modal-title">💹 보유 종목 추가</h3>
+    <select id="iv-person" class="modal-textarea" style="display:none">
+      <option value="진범">진범</option>
+      <option value="소연">소연</option>
+    </select>
+    <input class="modal-textarea" id="iv-stock" placeholder="종목명 (예: SCHD)" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+    <input class="modal-textarea" id="iv-account" placeholder="증권계좌 (예: 토스증권, 미래에셋)" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+    <input type="number" class="modal-textarea" id="iv-shares" placeholder="보유 주수" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+    <input type="number" class="modal-textarea" id="iv-avgprice" placeholder="평단가 (1주당 매입가, 원)" style="min-height:auto;padding:13px 14px;font-size:14px">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeInvestModal()">취소</button>
+      <button class="btn-save" id="invest-save-btn" onclick="saveInvestEntry()">추가</button>
     </div>
   </div>
 </div>
@@ -1181,7 +1201,7 @@ const LS = {
   habits: 'ff_habits', notes: 'ff_notes', weekTasks: 'ff_week', memo: 'ff_memo',
   ledger: 'ff_ledger', dividends: 'ff_dividends', dividendGoal: 'ff_dividend_goal',
   ledgerCustomCats: 'ff_ledger_custom_cats', ledgerRecurring: 'ff_ledger_recurring',
-  ledgerRecurringApplied: 'ff_ledger_recurring_applied'
+  ledgerRecurringApplied: 'ff_ledger_recurring_applied', investments: 'ff_investments'
 };
 function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); syncScheduleAutoUpload(); } catch(e){} }
 function load(key, def) { try { const v=localStorage.getItem(key); return v?JSON.parse(v):def; } catch(e){ return def; } }
@@ -1190,7 +1210,7 @@ function load(key, def) { try { const v=localStorage.getItem(key); return v?JSON
 // ── GITHUB 동기화 모듈 (자동) ──
 // 동기화 대상 데이터 키 (실제 콘텐츠 데이터만, 인증정보는 별도 저장)
 // ════════════════════════════════════════════════════════════
-const SYNC_DATA_KEYS = ['ff_tasks','ff_goals','ff_projects','ff_habits','ff_notes','ff_week','ff_memo','ff_manual_location','ff_ledger','ff_dividends','ff_dividend_goal','ff_ledger_custom_cats','ff_ledger_recurring','ff_ledger_recurring_applied'];
+const SYNC_DATA_KEYS = ['ff_tasks','ff_goals','ff_projects','ff_habits','ff_notes','ff_week','ff_memo','ff_manual_location','ff_ledger','ff_dividends','ff_dividend_goal','ff_ledger_custom_cats','ff_ledger_recurring','ff_ledger_recurring_applied','ff_investments'];
 const SYNC_CFG_KEY = 'ff_sync_cfg'; // {token, owner, repo} — 이 기기에만 저장됨
 const SYNC_FILE_PATH = 'focusflow-data.json';
 const SYNC_DEBOUNCE_MS = 2500; // 마지막 수정 후 이 시간만큼 조작이 없으면 자동 업로드
@@ -1400,6 +1420,7 @@ function renderAllAfterSync() {
     dividendEntries = load(LS.dividends, dividendEntries);
     ledgerCustomCategories = load(LS.ledgerCustomCats, ledgerCustomCategories);
     ledgerRecurring = load(LS.ledgerRecurring, ledgerRecurring);
+    investments = load(LS.investments, investments);
     if (typeof renderTasks === 'function') renderTasks();
     if (typeof renderGoals === 'function') renderGoals();
     if (typeof renderTab === 'function') renderTab(document.querySelector('.nav-chip.active')?.dataset.tab || 'daily');
@@ -1564,6 +1585,63 @@ function dividendYearKey(mk) { return mk.slice(0,4); }
 // ── 목표 월 배당 ──
 let dividendGoal = load(LS.dividendGoal, 0); // 0이면 미설정
 function saveDividendGoal(val) { dividendGoal = val; save(LS.dividendGoal, val); }
+
+// ── 재테크 (보유 종목, 증권계좌별) ──
+// 구조: {id, person:'진범'|'소연', stock:종목명, account:증권계좌명, shares:보유주수, avgPrice:1주당 평단가(원)}
+let investments = load(LS.investments, []);
+let investEditId = null; // 수정 중인 항목 id (null이면 새로 추가)
+
+function openInvestModal(editId, person) {
+  investEditId = editId || null;
+  const modalTitle = document.getElementById('invest-modal-title');
+  const saveBtn = document.getElementById('invest-save-btn');
+  if (investEditId) {
+    const iv = investments.find(x=>x.id===investEditId);
+    document.getElementById('iv-person').value = iv.person;
+    document.getElementById('iv-stock').value = iv.stock;
+    document.getElementById('iv-account').value = iv.account;
+    document.getElementById('iv-shares').value = iv.shares;
+    document.getElementById('iv-avgprice').value = iv.avgPrice;
+    modalTitle.textContent = '💹 '+iv.person+' · 보유 종목 수정';
+    saveBtn.textContent = '수정';
+  } else {
+    const targetPerson = person || DIV_PEOPLE[0];
+    document.getElementById('iv-person').value = targetPerson;
+    document.getElementById('iv-stock').value = '';
+    document.getElementById('iv-account').value = '';
+    document.getElementById('iv-shares').value = '';
+    document.getElementById('iv-avgprice').value = '';
+    modalTitle.textContent = '💹 '+targetPerson+' · 계좌 추가';
+    saveBtn.textContent = '추가';
+  }
+  document.getElementById('invest-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('iv-stock').focus(),100);
+}
+function closeInvestModal() { document.getElementById('invest-modal').classList.remove('open'); investEditId = null; }
+function saveInvestEntry() {
+  const person = document.getElementById('iv-person').value;
+  const stock = document.getElementById('iv-stock').value.trim();
+  const account = document.getElementById('iv-account').value.trim();
+  const shares = parseFloat(document.getElementById('iv-shares').value);
+  const avgPrice = parseFloat(document.getElementById('iv-avgprice').value);
+  if (!stock) { document.getElementById('iv-stock').focus(); return; }
+  if (!account) { document.getElementById('iv-account').focus(); return; }
+  if (!shares || shares <= 0) { document.getElementById('iv-shares').focus(); return; }
+  if (!avgPrice || avgPrice <= 0) { document.getElementById('iv-avgprice').focus(); return; }
+  if (investEditId) {
+    const iv = investments.find(x=>x.id===investEditId);
+    if (iv) { iv.person = person; iv.stock = stock; iv.account = account; iv.shares = shares; iv.avgPrice = avgPrice; }
+  } else {
+    investments.push({ id: Date.now(), person, stock, account, shares, avgPrice });
+  }
+  save(LS.investments, investments);
+  closeInvestModal();
+  if (currentTab === 'invest') renderTab('invest');
+}
+function deleteInvestEntry(id) {
+  const i = investments.findIndex(x=>x.id===id);
+  if (i>-1) { investments.splice(i,1); save(LS.investments, investments); if (currentTab==='invest') renderTab('invest'); }
+}
 
 // ── 가계부+배당 통합 ──
 function combinedNetForMonth(mk) {
@@ -2924,6 +3002,76 @@ function tabHTML(tab) {
     </div>`;
   }
 
+  if(tab==='invest') {
+    function invStockGroups(person) {
+      const rows = investments.filter(iv=>iv.person===person);
+      const byStock = {};
+      rows.forEach(iv=>{
+        if (!byStock[iv.stock]) byStock[iv.stock] = [];
+        byStock[iv.stock].push(iv);
+      });
+      return byStock;
+    }
+    function invPersonTotal(person) {
+      return investments.filter(iv=>iv.person===person).reduce((s,iv)=>s+iv.shares*iv.avgPrice,0);
+    }
+    const invGrandTotal = investments.reduce((s,iv)=>s+iv.shares*iv.avgPrice,0);
+
+    function invPersonBlock(person) {
+      const groups = invStockGroups(person);
+      const stockNames = Object.keys(groups);
+      const total = invPersonTotal(person);
+      const stockCards = stockNames.length ? stockNames.map(function(stock){
+        const accs = groups[stock];
+        const totalShares = accs.reduce(function(s,a){ return s+a.shares; },0);
+        const totalCost = accs.reduce(function(s,a){ return s+a.shares*a.avgPrice; },0);
+        const weightedAvg = totalShares>0 ? Math.round(totalCost/totalShares) : 0;
+        const accRows = accs.map(function(a){
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--border)">'
+            +'<div style="min-width:0;cursor:pointer" onclick="openInvestModal('+a.id+')">'
+            +'<div style="font-size:12px;color:var(--text2)">'+a.account+'</div>'
+            +'</div>'
+            +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
+            +'<span style="font-size:12px;color:var(--text);cursor:pointer" onclick="openInvestModal('+a.id+')">'+a.shares.toLocaleString()+'주 · '+a.avgPrice.toLocaleString()+'원</span>'
+            +'<span onclick="deleteInvestEntry('+a.id+')" style="color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px" onmouseover="this.style.color=\'#f87171\'" onmouseout="this.style.color=\'var(--text3)\'">×</span>'
+            +'</div></div>';
+        }).join('');
+        return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px">'
+          +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
+          +'<span style="font-size:14px;font-weight:600;color:var(--text)">'+stock+'</span>'
+          +'<span style="font-size:13px;font-weight:600;color:var(--accent2)">'+totalShares.toLocaleString()+'주</span>'
+          +'</div>'
+          +'<div style="font-size:11px;color:var(--text3);margin-bottom:2px">평단가 '+weightedAvg.toLocaleString()+'원 · 총 매입 '+totalCost.toLocaleString()+'원</div>'
+          +accRows
+          +'</div>';
+      }).join('') : '<div style="font-size:12px;color:var(--text3);padding:8px 0">등록된 종목이 없어요</div>';
+
+      return '<div style="flex:1;min-width:0">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+        +'<div style="font-size:13px;font-weight:600;color:var(--text)">'+person+'</div>'
+        +'<div style="font-size:13px;font-weight:600;color:var(--accent)">'+total.toLocaleString()+'원</div>'
+        +'</div>'
+        +stockCards
+        +'<button class="task-add-btn" style="font-size:12px;padding:6px 12px;width:100%" onclick="openInvestModal(null,\''+person+'\')">+ 계좌 추가</button>'
+        +'</div>';
+    }
+
+    return `
+    <div class="content-block" style="margin-bottom:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div class="block-title" style="margin-bottom:0">💹 재테크 · 보유 종목</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">전체 총 매입금액</div>
+        <div style="font-size:20px;font-weight:600;color:var(--accent)">${invGrandTotal.toLocaleString()}원</div>
+      </div>
+      <div class="dividend-person-row" style="display:flex;gap:14px;flex-wrap:wrap">
+        ${invPersonBlock(DIV_PEOPLE[0])}
+        ${invPersonBlock(DIV_PEOPLE[1])}
+      </div>
+    </div>`;
+  }
+
   if(tab==='lifeclock') return `
     <div class="content-block" style="margin-bottom:0;padding:0;overflow:hidden">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 0">
@@ -2988,7 +3136,7 @@ document.querySelectorAll('.nav-chip').forEach(el=>{
 });
 
 // ── CLOSE MODALS ON OVERLAY CLICK ──
-['memo-modal','goal-modal','note-modal','habit-modal','project-modal','note-detail-modal','project-add-modal','week-task-modal','ledger-modal','dividend-modal','recurring-modal'].forEach(id=>{
+['memo-modal','goal-modal','note-modal','habit-modal','project-modal','note-detail-modal','project-add-modal','week-task-modal','ledger-modal','dividend-modal','recurring-modal','invest-modal'].forEach(id=>{
   const el = document.getElementById(id);
   if(el) el.addEventListener('click', function(e){ if(e.target===this) this.classList.remove('open'); });
 });
