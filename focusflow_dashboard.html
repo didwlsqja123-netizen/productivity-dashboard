@@ -271,14 +271,15 @@ html, body {
   font-size: 14px; color: var(--text);
   transition: background 0.15s, opacity 0.15s;
   border-radius: 6px;
+  position: relative;
 }
 .goal-item:last-child { border-bottom: none; }
-.goal-item.dragging { opacity: 0.32; }
+.goal-item.dragging { opacity: 0.85; background: rgba(255,255,255,0.06); transition: none; }
 .goal-item.drag-over { background: rgba(255,255,255,0.05); }
 .goal-drag-handle {
   display: flex; flex-direction: column; gap: 3px;
-  cursor: grab; padding: 2px 3px; flex-shrink: 0; opacity: 0.25;
-  transition: opacity 0.15s;
+  cursor: grab; padding: 2px 3px; flex-shrink: 0; opacity: 0.4;
+  transition: opacity 0.15s; touch-action: none;
 }
 .goal-drag-handle:active { cursor: grabbing; }
 .goal-item:hover .goal-drag-handle { opacity: 0.6; }
@@ -1896,7 +1897,7 @@ function renderGoals() {
     return;
   }
   el.innerHTML = goals.map(g=>`
-    <div class="goal-item" draggable="true" data-id="${g.id}">
+    <div class="goal-item" data-id="${g.id}">
       <div class="goal-drag-handle" title="드래그해서 순서 변경">
         <span></span><span></span><span></span>
       </div>
@@ -1911,37 +1912,67 @@ function renderGoals() {
     item.addEventListener('mouseleave', () => { item.querySelector('.goal-del-btn').style.opacity='0'; });
   });
 
-  // 드래그 앤 드롭
-  let dragId = null;
-  el.querySelectorAll('.goal-item').forEach(item => {
-    item.addEventListener('dragstart', e => {
-      dragId = Number(item.dataset.id);
-      setTimeout(() => item.classList.add('dragging'), 0);
-      e.dataTransfer.effectAllowed = 'move';
+  // 드래그 앤 드롭 (Pointer Events 기반 — 마우스/터치 모두 지원)
+  let dragItem = null, dragId = null, startY = 0, itemHeight = 0;
+
+  function onPointerMove(e) {
+    if(!dragItem) return;
+    e.preventDefault();
+    const dy = e.clientY - startY;
+    dragItem.style.transform = `translateY(${dy}px)`;
+
+    const items = [...el.querySelectorAll('.goal-item')];
+    const overItem = items.find(i => {
+      if(i === dragItem) return false;
+      const r = i.getBoundingClientRect();
+      return e.clientY > r.top && e.clientY < r.bottom;
     });
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging');
-      el.querySelectorAll('.goal-item').forEach(i => i.classList.remove('drag-over'));
+    items.forEach(i => i.classList.remove('drag-over'));
+    if(overItem) overItem.classList.add('drag-over');
+  }
+
+  function onPointerUp(e) {
+    if(!dragItem) return;
+    document.removeEventListener('pointermove', onPointerMove);
+    document.removeEventListener('pointerup', onPointerUp);
+
+    const items = [...el.querySelectorAll('.goal-item')];
+    const overItem = items.find(i => {
+      if(i === dragItem) return false;
+      const r = i.getBoundingClientRect();
+      return e.clientY > r.top && e.clientY < r.bottom;
     });
-    item.addEventListener('dragover', e => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      el.querySelectorAll('.goal-item').forEach(i => i.classList.remove('drag-over'));
-      if(Number(item.dataset.id) !== dragId) item.classList.add('drag-over');
-    });
-    item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
-    item.addEventListener('drop', e => {
-      e.preventDefault();
-      item.classList.remove('drag-over');
-      const toId = Number(item.dataset.id);
-      if(dragId === toId) return;
+
+    dragItem.classList.remove('dragging');
+    dragItem.style.transform = '';
+    items.forEach(i => i.classList.remove('drag-over'));
+
+    if(overItem) {
+      const toId = Number(overItem.dataset.id);
       const fromIdx = goals.findIndex(g=>g.id===dragId);
       const toIdx   = goals.findIndex(g=>g.id===toId);
-      if(fromIdx<0||toIdx<0) return;
-      const [moved] = goals.splice(fromIdx, 1);
-      goals.splice(toIdx, 0, moved);
-      save(LS.goals, goals);
-      renderGoals();
+      if(fromIdx>=0 && toIdx>=0 && fromIdx!==toIdx) {
+        const [moved] = goals.splice(fromIdx, 1);
+        goals.splice(toIdx, 0, moved);
+        save(LS.goals, goals);
+      }
+    }
+    dragItem = null; dragId = null;
+    renderGoals();
+  }
+
+  el.querySelectorAll('.goal-drag-handle').forEach(handle => {
+    handle.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      const item = handle.closest('.goal-item');
+      dragItem = item;
+      dragId = Number(item.dataset.id);
+      startY = e.clientY;
+      itemHeight = item.getBoundingClientRect().height;
+      item.classList.add('dragging');
+      item.style.zIndex = '10';
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp);
     });
   });
 }
