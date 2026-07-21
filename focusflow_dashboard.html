@@ -1590,15 +1590,22 @@ function saveDividendGoal(val) { dividendGoal = val; save(LS.dividendGoal, val);
 // 구조: {id, person:'진범'|'소연', stock:종목명, account:증권계좌명, shares:보유주수, avgPrice:1주당 평단가(원)}
 let investments = load(LS.investments, []);
 let investEditId = null; // 수정 중인 항목 id (null이면 새로 추가)
+let investPersonTab = DIV_PEOPLE[0]; // 재테크 탭에서 현재 보고 있는 인물
+function switchInvestPersonTab(person) {
+  investPersonTab = person;
+  if (currentTab === 'invest') renderTab('invest');
+}
 
-function openInvestModal(editId, person) {
+function openInvestModal(editId, person, stock) {
   investEditId = editId || null;
   const modalTitle = document.getElementById('invest-modal-title');
   const saveBtn = document.getElementById('invest-save-btn');
+  const stockInput = document.getElementById('iv-stock');
   if (investEditId) {
     const iv = investments.find(x=>x.id===investEditId);
     document.getElementById('iv-person').value = iv.person;
-    document.getElementById('iv-stock').value = iv.stock;
+    stockInput.value = iv.stock;
+    stockInput.style.display = '';
     document.getElementById('iv-account').value = iv.account;
     document.getElementById('iv-shares').value = iv.shares;
     document.getElementById('iv-avgprice').value = iv.avgPrice;
@@ -1607,15 +1614,22 @@ function openInvestModal(editId, person) {
   } else {
     const targetPerson = person || DIV_PEOPLE[0];
     document.getElementById('iv-person').value = targetPerson;
-    document.getElementById('iv-stock').value = '';
     document.getElementById('iv-account').value = '';
     document.getElementById('iv-shares').value = '';
     document.getElementById('iv-avgprice').value = '';
-    modalTitle.textContent = '💹 '+targetPerson+' · 계좌 추가';
+    stockInput.style.display = '';
+    if (stock) {
+      // 이미 있는 종목에 계좌만 추가하는 경우: 종목명이 미리 채워져 있음 (필요하면 수정 가능)
+      stockInput.value = stock;
+      modalTitle.textContent = '💹 '+targetPerson+' · '+stock+' · 계좌 추가';
+    } else {
+      stockInput.value = '';
+      modalTitle.textContent = '💹 '+targetPerson+' · 종목 추가';
+    }
     saveBtn.textContent = '추가';
   }
   document.getElementById('invest-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('iv-stock').focus(),100);
+  setTimeout(()=>document.getElementById(stock && !investEditId ? 'iv-account' : 'iv-stock').focus(),100);
 }
 function closeInvestModal() { document.getElementById('invest-modal').classList.remove('open'); investEditId = null; }
 function saveInvestEntry() {
@@ -3043,6 +3057,7 @@ function tabHTML(tab) {
           +'</div>'
           +'<div style="font-size:11px;color:var(--text3);margin-bottom:2px">평단가 '+weightedAvg.toLocaleString()+'원 · 총 매입 '+totalCost.toLocaleString()+'원</div>'
           +accRows
+          +'<div style="padding-top:8px;margin-top:2px;border-top:1px solid var(--border)"><span style="font-size:12px;color:var(--accent2);cursor:pointer" onclick="openInvestModal(null,\''+person+'\',\''+stock.replace(/'/g,"\\'")+'\')">+ 계좌 추가</span></div>'
           +'</div>';
       }).join('') : '<div style="font-size:12px;color:var(--text3);padding:8px 0">등록된 종목이 없어요</div>';
 
@@ -3052,7 +3067,7 @@ function tabHTML(tab) {
         +'<div style="font-size:13px;font-weight:600;color:var(--accent)">'+total.toLocaleString()+'원</div>'
         +'</div>'
         +stockCards
-        +'<button class="task-add-btn" style="font-size:12px;padding:6px 12px;width:100%" onclick="openInvestModal(null,\''+person+'\')">+ 계좌 추가</button>'
+        +'<button class="task-add-btn" style="font-size:12px;padding:6px 12px;width:100%" onclick="openInvestModal(null,\''+person+'\')">+ 종목 추가</button>'
         +'</div>';
     }
 
@@ -3065,10 +3080,13 @@ function tabHTML(tab) {
         <div style="font-size:11px;color:var(--text2);margin-bottom:4px">전체 총 매입금액</div>
         <div style="font-size:20px;font-weight:600;color:var(--accent)">${invGrandTotal.toLocaleString()}원</div>
       </div>
-      <div class="dividend-person-row" style="display:flex;gap:14px;flex-wrap:wrap">
-        ${invPersonBlock(DIV_PEOPLE[0])}
-        ${invPersonBlock(DIV_PEOPLE[1])}
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        ${DIV_PEOPLE.map(function(p){
+          const active = p===investPersonTab;
+          return '<button onclick="switchInvestPersonTab(\''+p+'\')" style="flex:1;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid '+(active?'var(--accent2)':'var(--border)')+';background:'+(active?'rgba(127,200,232,0.12)':'var(--surface2)')+';color:'+(active?'var(--accent2)':'var(--text2)')+'">'+p+'</button>';
+        }).join('')}
       </div>
+      ${invPersonBlock(investPersonTab)}
     </div>`;
   }
 
