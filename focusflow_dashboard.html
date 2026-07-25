@@ -671,7 +671,10 @@ html, body {
       <option value="진범">진범</option>
       <option value="소연">소연</option>
     </select>
-    <select class="modal-textarea" id="dv-stock-select" onchange="onDivStockSelectChange()" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px"></select>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <select class="modal-textarea" id="dv-stock-select" onchange="onDivStockSelectChange()" style="flex:1;min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:0"></select>
+      <button type="button" onclick="renameSelectedStockInDividendModal()" style="flex-shrink:0;padding:0 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:13px;cursor:pointer">✎ 이름수정</button>
+    </div>
     <input class="modal-textarea" id="dv-stock-new" placeholder="새 종목명 입력 (예: SCHD)" style="display:none;min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
     <select class="modal-textarea" id="dv-accttype" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
       <option value="일반계좌">일반계좌 (과세)</option>
@@ -1628,26 +1631,32 @@ function ensureStockRegistered(name) {
 function applyStockRename(oldName, newName) {
   investments.forEach(function(iv){ if (iv.stock === oldName) iv.stock = newName; });
   save(LS.investments, investments);
+  dividendEntries.forEach(function(d){ if (d.stock === oldName) d.stock = newName; });
+  save(LS.dividends, dividendEntries);
   ensureStockRegistered(newName);
-  // 더 이상 아무 항목도 쓰지 않는 이전 이름은 드롭다운 목록에서 제거
-  if (!investments.some(function(iv){ return iv.stock === oldName; })) {
+  // 더 이상 재테크/배당내역 어디에서도 쓰지 않는 이전 이름은 드롭다운 목록에서 제거
+  const stillUsed = investments.some(function(iv){ return iv.stock === oldName; })
+    || dividendEntries.some(function(d){ return d.stock === oldName; });
+  if (!stillUsed) {
     const idx = investStockList.indexOf(oldName);
     if (idx > -1) { investStockList.splice(idx,1); save(LS.investStocks, investStockList); }
   }
 }
-function renameSelectedStockInModal() {
-  const sel = document.getElementById('iv-stock-select');
+function renameStockFromSelect(selectId) {
+  const sel = document.getElementById(selectId);
   const oldName = sel.value;
   if (!oldName || oldName === NEW_STOCK_VALUE) { alert('수정할 종목을 먼저 드롭다운에서 선택해주세요.'); return; }
-  const input = prompt('종목명 수정 (진범/소연 모두 반영돼요)', oldName);
+  const input = prompt('종목명 수정 (재테크/배당내역 모두 반영돼요)', oldName);
   if (input === null) return; // 취소
   const newName = input.trim();
   if (!newName || newName === oldName) return;
   applyStockRename(oldName, newName);
   sel.innerHTML = investStockOptionsHtml(newName);
   sel.value = newName;
-  if (currentTab === 'invest') renderTab('invest');
+  if (currentTab === 'invest' || currentTab === 'dividend') renderTab(currentTab);
 }
+function renameSelectedStockInModal() { renameStockFromSelect('iv-stock-select'); }
+function renameSelectedStockInDividendModal() { renameStockFromSelect('dv-stock-select'); }
 function investStockOptionsHtml(selected) {
   const newOpt = '<option value="'+NEW_STOCK_VALUE+'"'+(selected===NEW_STOCK_VALUE?' selected':'')+'>+ 새 종목 추가</option>';
   const opts = investStockList.slice().sort(function(a,b){ return a.localeCompare(b,'ko'); }).map(function(s){
