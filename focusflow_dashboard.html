@@ -695,6 +695,11 @@ html, body {
     </div>
     <input class="modal-textarea" id="iv-stock-new" placeholder="새 종목명 입력 (예: SCHD)" style="display:none;min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
     <input class="modal-textarea" id="iv-account" placeholder="증권계좌 (예: 토스증권, 미래에셋)" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+    <select class="modal-textarea" id="iv-accttype" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+      <option value="일반계좌">일반계좌 (과세)</option>
+      <option value="ISA">ISA</option>
+      <option value="연금저축">연금저축(IRP 포함)</option>
+    </select>
     <input type="number" class="modal-textarea" id="iv-shares" placeholder="보유 주수" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
     <input type="number" class="modal-textarea" id="iv-avgprice" placeholder="평단가 (1주당 매입가, 원)" style="min-height:auto;padding:13px 14px;font-size:14px">
     <div class="modal-btns">
@@ -1674,6 +1679,7 @@ function openInvestModal(editId, person, stock) {
     stockSelect.value = iv.stock;
     stockNewInput.style.display = 'none';
     document.getElementById('iv-account').value = iv.account;
+    document.getElementById('iv-accttype').value = iv.acctType || '일반계좌';
     document.getElementById('iv-shares').value = iv.shares;
     document.getElementById('iv-avgprice').value = iv.avgPrice;
     modalTitle.textContent = '💹 '+iv.person+' · 보유 종목 수정';
@@ -1683,6 +1689,7 @@ function openInvestModal(editId, person, stock) {
     const targetPerson = person || DIV_PEOPLE[0];
     document.getElementById('iv-person').value = targetPerson;
     document.getElementById('iv-account').value = '';
+    document.getElementById('iv-accttype').value = '일반계좌';
     document.getElementById('iv-shares').value = '';
     document.getElementById('iv-avgprice').value = '';
     if (stock) {
@@ -1711,6 +1718,7 @@ function saveInvestEntry() {
   const stockSelVal = document.getElementById('iv-stock-select').value;
   const stock = (stockSelVal === NEW_STOCK_VALUE ? document.getElementById('iv-stock-new').value : stockSelVal).trim();
   const account = document.getElementById('iv-account').value.trim();
+  const acctType = document.getElementById('iv-accttype').value;
   const shares = parseFloat(document.getElementById('iv-shares').value);
   const avgPrice = parseFloat(document.getElementById('iv-avgprice').value);
   if (!stock) { document.getElementById(stockSelVal===NEW_STOCK_VALUE ? 'iv-stock-new' : 'iv-stock-select').focus(); return; }
@@ -1720,9 +1728,9 @@ function saveInvestEntry() {
   ensureStockRegistered(stock);
   if (investEditId) {
     const iv = investments.find(x=>x.id===investEditId);
-    if (iv) { iv.person = person; iv.stock = stock; iv.account = account; iv.shares = shares; iv.avgPrice = avgPrice; }
+    if (iv) { iv.person = person; iv.stock = stock; iv.account = account; iv.acctType = acctType; iv.shares = shares; iv.avgPrice = avgPrice; }
   } else {
-    investments.push({ id: Date.now(), person, stock, account, shares, avgPrice });
+    investments.push({ id: Date.now(), person, stock, account, acctType, shares, avgPrice });
   }
   save(LS.investments, investments);
   closeInvestModal();
@@ -3214,10 +3222,12 @@ function tabHTML(tab) {
         const totalShares = accs.reduce(function(s,a){ return s+a.shares; },0);
         const totalCost = accs.reduce(function(s,a){ return s+a.shares*a.avgPrice; },0);
         const weightedAvg = totalShares>0 ? Math.round(totalCost/totalShares) : 0;
+        const acctTypeColor = {'일반계좌':'var(--text3)','ISA':'#7a9ec4','연금저축':'#a98fd4'};
         const accRows = accs.map(function(a){
+          const at = a.acctType || '일반계좌';
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--border)">'
             +'<div style="min-width:0;cursor:pointer" onclick="openInvestModal('+a.id+')">'
-            +'<div style="font-size:12px;color:var(--text2)">'+a.account+'</div>'
+            +'<div style="font-size:12px;color:var(--text2)">'+a.account+' <span style="color:'+(acctTypeColor[at]||'var(--text3)')+'">· '+at+'</span></div>'
             +'</div>'
             +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
             +'<span style="font-size:12px;color:var(--text);cursor:pointer" onclick="openInvestModal('+a.id+')">'+a.shares.toLocaleString()+'주 · '+a.avgPrice.toLocaleString()+'원</span>'
