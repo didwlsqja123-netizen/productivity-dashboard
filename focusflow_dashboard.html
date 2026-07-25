@@ -671,7 +671,8 @@ html, body {
       <option value="진범">진범</option>
       <option value="소연">소연</option>
     </select>
-    <input class="modal-textarea" id="dv-stock" placeholder="종목명 (예: SCHD)" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+    <select class="modal-textarea" id="dv-stock-select" onchange="onDivStockSelectChange()" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px"></select>
+    <input class="modal-textarea" id="dv-stock-new" placeholder="새 종목명 입력 (예: SCHD)" style="display:none;min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
     <select class="modal-textarea" id="dv-accttype" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
       <option value="일반계좌">일반계좌 (과세)</option>
       <option value="ISA">ISA</option>
@@ -1665,6 +1666,17 @@ function onInvStockSelectChange() {
     newInput.style.display = 'none';
   }
 }
+function onDivStockSelectChange() {
+  const sel = document.getElementById('dv-stock-select');
+  const newInput = document.getElementById('dv-stock-new');
+  if (sel.value === NEW_STOCK_VALUE) {
+    newInput.style.display = '';
+    newInput.value = '';
+    newInput.focus();
+  } else {
+    newInput.style.display = 'none';
+  }
+}
 function switchInvestPersonTab(person) {
   investPersonTab = person;
   if (currentTab === 'invest') renderTab('invest');
@@ -2283,39 +2295,51 @@ function openDividendModal(editId) {
   dividendEditId = editId || null;
   const modalTitle = document.getElementById('dividend-modal-title');
   const saveBtn = document.getElementById('dividend-save-btn');
+  const stockSelect = document.getElementById('dv-stock-select');
+  const stockNewInput = document.getElementById('dv-stock-new');
+  let focusId;
   if (dividendEditId) {
     const d = dividendEntries.find(x=>x.id===dividendEditId);
     document.getElementById('dv-month').value = d.month;
     document.getElementById('dv-person').value = d.person;
-    document.getElementById('dv-stock').value = d.stock;
+    stockSelect.innerHTML = investStockOptionsHtml(d.stock);
+    stockSelect.value = d.stock;
+    stockNewInput.style.display = 'none';
     document.getElementById('dv-accttype').value = d.acctType || '일반계좌';
     document.getElementById('dv-shares').value = d.shares || '';
     document.getElementById('dv-amount').value = d.amount;
     modalTitle.textContent = '📈 배당 기록 수정';
     saveBtn.textContent = '수정';
+    focusId = 'dv-stock-select';
   } else {
     document.getElementById('dv-month').value = dividendViewMonth;
     document.getElementById('dv-person').value = DIV_PEOPLE[0];
-    document.getElementById('dv-stock').value = '';
+    stockSelect.innerHTML = investStockOptionsHtml(NEW_STOCK_VALUE);
+    stockSelect.value = NEW_STOCK_VALUE;
+    stockNewInput.style.display = '';
+    stockNewInput.value = '';
     document.getElementById('dv-accttype').value = '일반계좌';
     document.getElementById('dv-shares').value = '';
     document.getElementById('dv-amount').value = '';
     modalTitle.textContent = '📈 배당 기록 추가';
     saveBtn.textContent = '추가';
+    focusId = 'dv-stock-new';
   }
   document.getElementById('dividend-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('dv-stock').focus(),100);
+  setTimeout(()=>document.getElementById(focusId).focus(),100);
 }
 function closeDividendModal() { document.getElementById('dividend-modal').classList.remove('open'); dividendEditId = null; }
 function saveDividendEntry() {
   const month = document.getElementById('dv-month').value || dividendViewMonth;
   const person = document.getElementById('dv-person').value;
-  const stock = document.getElementById('dv-stock').value.trim();
+  const stockSelVal = document.getElementById('dv-stock-select').value;
+  const stock = (stockSelVal === NEW_STOCK_VALUE ? document.getElementById('dv-stock-new').value : stockSelVal).trim();
   const acctType = document.getElementById('dv-accttype').value;
   const shares = parseFloat(document.getElementById('dv-shares').value);
   const amount = parseFloat(document.getElementById('dv-amount').value);
-  if (!stock) { document.getElementById('dv-stock').focus(); return; }
+  if (!stock) { document.getElementById(stockSelVal===NEW_STOCK_VALUE ? 'dv-stock-new' : 'dv-stock-select').focus(); return; }
   if (!amount || amount <= 0) { document.getElementById('dv-amount').focus(); return; }
+  ensureStockRegistered(stock);
   if (dividendEditId) {
     const d = dividendEntries.find(x=>x.id===dividendEditId);
     if (d) { d.month = month; d.person = person; d.stock = stock; d.acctType = acctType; d.shares = shares||0; d.amount = amount; }
