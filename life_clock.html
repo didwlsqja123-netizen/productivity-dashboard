@@ -372,8 +372,8 @@ canvas{width:100%;display:block}
     </div>
     <div class="stg-body">
       <div class="inp-row">
-        <div class="inp-box"><div class="inp-lbl">ETF 원금<span class="hint">현재 평가액</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="g_p" type="number" value="25000"/><span class="inp-unit">만원</span></div></div>
-        <div class="inp-box"><div class="inp-lbl">연 배당률<span class="hint">세전</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="g_yield" type="number" value="14.4" step=".1"/><span class="inp-unit">%</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">ETF 원금<span class="hint">재테크 탭 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="g_p" type="number" value="25000" readonly style="color:var(--mut2)"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">연 배당률<span class="hint">배당내역 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="g_yield" type="number" value="14.4" step=".1" readonly style="color:var(--mut2)"/><span class="inp-unit">%</span></div></div>
       </div>
       <div class="auto-row">
         <span class="auto-k">월 분배금 (자동계산)</span>
@@ -389,11 +389,11 @@ canvas{width:100%;display:block}
   <div class="stg-card">
     <div class="stg-hdr" style="background:rgba(109,184,124,.06)">
       <div class="stg-num" style="background:rgba(109,184,124,.15);color:var(--grn)">②</div>
-      <div><div class="stg-name" style="color:var(--grn)">ISA 중개형</div><div class="stg-sub">세금 필터 · 5년 사이클</div></div>
+      <div><div class="stg-name" style="color:var(--grn)">ISA 중개형</div><div class="stg-sub">세금 필터 · <span id="isaCycleSub">5</span>년 사이클</div></div>
     </div>
     <div class="stg-body">
       <div class="inp-row">
-        <div class="inp-box"><div class="inp-lbl">현재 잔액</div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cur" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">현재 잔액<span class="hint">재테크 탭 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cur" type="number" value="0" readonly style="color:var(--mut2)"/><span class="inp-unit">만원</span></div></div>
         <div class="inp-box"><div class="inp-lbl">연 납입액<span class="hint">한도 2,000만원</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_contrib" type="number" value="2000"/><span class="inp-unit">만원</span></div></div>
       </div>
       <div style="font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut);letter-spacing:.1em;padding:2px 0">포트폴리오 구성</div>
@@ -401,7 +401,7 @@ canvas{width:100%;display:block}
         <div class="ratio-hdr" style="color:var(--acc)">커버드콜 ETF</div>
         <div class="inp-row" style="margin-top:8px">
           <div class="inp-box"><div class="inp-lbl">비율</div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cc_pct" type="number" value="70" min="0" max="100"/><span class="inp-unit">%</span></div></div>
-          <div class="inp-box"><div class="inp-lbl">연 배당률</div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cc_yield" type="number" value="14.4" step=".1"/><span class="inp-unit">%</span></div></div>
+          <div class="inp-box"><div class="inp-lbl">연 배당률<span class="hint">배당내역 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cc_yield" type="number" value="14.4" step=".1" readonly style="color:var(--mut2)"/><span class="inp-unit">%</span></div></div>
         </div>
       </div>
       <div class="ratio-card">
@@ -430,7 +430,7 @@ canvas{width:100%;display:block}
     </div>
     <div class="stg-body">
       <div class="inp-row">
-        <div class="inp-box"><div class="inp-lbl">과세제외금액<span class="hint">원금, 인출 시 세금 0%</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_excl" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">과세제외금액<span class="hint">원금·인출세금0% · 자동연동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_excl" type="number" value="0" readonly style="color:var(--mut2)"/><span class="inp-unit">만원</span></div></div>
         <div class="inp-box"><div class="inp-lbl">수익분 잔액<span class="hint">55세+ 연금수령</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_gain" type="number" value="0"/><span class="inp-unit">만원</span></div></div>
       </div>
       <div style="font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut);letter-spacing:.1em;padding:2px 0">포트폴리오 구성</div>
@@ -438,7 +438,7 @@ canvas{width:100%;display:block}
         <div class="ratio-hdr" style="color:var(--acc)">커버드콜 ETF</div>
         <div class="inp-row" style="margin-top:8px">
           <div class="inp-box"><div class="inp-lbl">비율</div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_cc_pct" type="number" value="70" min="0" max="100"/><span class="inp-unit">%</span></div></div>
-          <div class="inp-box"><div class="inp-lbl">연 배당률</div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_cc_yield" type="number" value="14.4" step=".1"/><span class="inp-unit">%</span></div></div>
+          <div class="inp-box"><div class="inp-lbl">연 배당률<span class="hint">배당내역 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_cc_yield" type="number" value="14.4" step=".1" readonly style="color:var(--mut2)"/><span class="inp-unit">%</span></div></div>
         </div>
       </div>
       <div class="ratio-card">
@@ -715,6 +715,7 @@ function runSim(){
   const iBlend=iCcPct*iCcYield + iActPct*iActRet;
   const iRet=iBlend;
   const isaCycle=gv('i_cycle')||5;
+  const isaCycleSubEl=document.getElementById('isaCycleSub');if(isaCycleSubEl)isaCycleSubEl.textContent=isaCycle;
 
   const pExcl=gv('p_excl'), pGain=gv('p_gain');
   const pCcPct=gv('p_cc_pct')/100, pCcYield=gv('p_cc_yield')/100;
@@ -1093,27 +1094,41 @@ function syncFromFocusFlow(){
   const iCur = Math.round(sumByType('ISA')/10000);
   const pExcl = Math.round(sumByType('연금저축')/10000);
 
-  // 최근 12개월 실제 배당금 합계 → 실효 배당률 역산 (일반계좌 원금 기준)
+  // 최근 12개월 실제 배당금 합계 → 계좌별 실효 배당률 역산 (각 계좌 원금 기준)
   const now = new Date();
   const last12Months = [];
   for (let i=0;i<12;i++){
     const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
     last12Months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
   }
-  const div12moWon = dividends.filter(d=>last12Months.includes(d.month)).reduce((s,d)=>s+d.amount,0);
-  const div12moM = div12moWon/10000; // 만원
+  const div12moByType = type => dividends
+    .filter(d=>last12Months.includes(d.month) && (d.acctType||'일반계좌')===type)
+    .reduce((s,d)=>s+d.amount,0);
+  const gDivWon = div12moByType('일반계좌');
+  const iDivWon = div12moByType('ISA');
+  const pDivWon = div12moByType('연금저축');
 
   const setAndFire = (id,val) => { const el=document.getElementById(id); if(el){ el.value=val; el.dispatchEvent(new Event('input')); } };
   setAndFire('g_p', gP);
   setAndFire('i_cur', iCur);
   setAndFire('p_excl', pExcl);
-  if (gP > 0 && div12moWon > 0) {
-    setAndFire('g_yield', Math.round((div12moM/gP*100)*10)/10);
+  if (gP > 0 && gDivWon > 0) {
+    setAndFire('g_yield', Math.round((gDivWon/10000/gP*100)*10)/10);
+  }
+  if (iCur > 0 && iDivWon > 0) {
+    setAndFire('i_cc_yield', Math.round((iDivWon/10000/iCur*100)*10)/10);
+  }
+  if (pExcl > 0 && pDivWon > 0) {
+    setAndFire('p_cc_yield', Math.round((pDivWon/10000/pExcl*100)*10)/10);
   }
 
   runSim();
   const ts = now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
+  const yieldNote = (iCur>0 && iDivWon>0) || (pExcl>0 && pDivWon>0)
+    ? '<br>ISA·연금저축 배당률도 반영됨 (커버드콜 비율 100%가 아니면 부정확할 수 있어요)'
+    : '';
   statusEl.innerHTML = '✓ 반영됨 ('+ts+') · 일반 '+fmtW(gP)+'원 · ISA '+fmtW(iCur)+'원 · 연금저축 '+fmtW(pExcl)+'원'
+    + yieldNote
     + '<br>연금 수익분(수익분 잔액)은 현재가 정보가 없어 수동 입력을 유지해요';
 }
 
