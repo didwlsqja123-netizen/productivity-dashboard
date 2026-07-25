@@ -672,6 +672,11 @@ html, body {
       <option value="소연">소연</option>
     </select>
     <input class="modal-textarea" id="dv-stock" placeholder="종목명 (예: SCHD)" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+    <select class="modal-textarea" id="dv-accttype" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
+      <option value="일반계좌">일반계좌 (과세)</option>
+      <option value="ISA">ISA</option>
+      <option value="연금저축">연금저축(IRP 포함)</option>
+    </select>
     <input type="number" class="modal-textarea" id="dv-shares" placeholder="보유 주수 (선택)" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
     <input type="number" class="modal-textarea" id="dv-amount" placeholder="이번 달 받은 금액 (원)" style="min-height:auto;padding:13px 14px;font-size:14px">
     <div class="modal-btns">
@@ -2283,6 +2288,7 @@ function openDividendModal(editId) {
     document.getElementById('dv-month').value = d.month;
     document.getElementById('dv-person').value = d.person;
     document.getElementById('dv-stock').value = d.stock;
+    document.getElementById('dv-accttype').value = d.acctType || '일반계좌';
     document.getElementById('dv-shares').value = d.shares || '';
     document.getElementById('dv-amount').value = d.amount;
     modalTitle.textContent = '📈 배당 기록 수정';
@@ -2291,6 +2297,7 @@ function openDividendModal(editId) {
     document.getElementById('dv-month').value = dividendViewMonth;
     document.getElementById('dv-person').value = DIV_PEOPLE[0];
     document.getElementById('dv-stock').value = '';
+    document.getElementById('dv-accttype').value = '일반계좌';
     document.getElementById('dv-shares').value = '';
     document.getElementById('dv-amount').value = '';
     modalTitle.textContent = '📈 배당 기록 추가';
@@ -2304,15 +2311,16 @@ function saveDividendEntry() {
   const month = document.getElementById('dv-month').value || dividendViewMonth;
   const person = document.getElementById('dv-person').value;
   const stock = document.getElementById('dv-stock').value.trim();
+  const acctType = document.getElementById('dv-accttype').value;
   const shares = parseFloat(document.getElementById('dv-shares').value);
   const amount = parseFloat(document.getElementById('dv-amount').value);
   if (!stock) { document.getElementById('dv-stock').focus(); return; }
   if (!amount || amount <= 0) { document.getElementById('dv-amount').focus(); return; }
   if (dividendEditId) {
     const d = dividendEntries.find(x=>x.id===dividendEditId);
-    if (d) { d.month = month; d.person = person; d.stock = stock; d.shares = shares||0; d.amount = amount; }
+    if (d) { d.month = month; d.person = person; d.stock = stock; d.acctType = acctType; d.shares = shares||0; d.amount = amount; }
   } else {
-    dividendEntries.push({ id: Date.now(), month, person, stock, shares: shares||0, amount });
+    dividendEntries.push({ id: Date.now(), month, person, stock, acctType, shares: shares||0, amount });
   }
   save(LS.dividends, dividendEntries);
   closeDividendModal();
@@ -2973,9 +2981,11 @@ function tabHTML(tab) {
       const rowsHtml = rows.length===0
         ? '<div style="font-size:12px;color:var(--text3);padding:8px 0">등록된 내역 없음</div>'
         : rows.map(function(d){
+            const at = d.acctType || '일반계좌';
+            const atColor = {'일반계좌':'var(--text3)','ISA':'#7a9ec4','연금저축':'#a98fd4'}[at]||'var(--text3)';
             return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--border);cursor:pointer" onclick="openDividendModal('+d.id+')">'
               + '<div style="min-width:0">'
-              + '<div style="font-size:13px;color:var(--text)">'+d.stock+'</div>'
+              + '<div style="font-size:13px;color:var(--text)">'+d.stock+' <span style="font-size:10px;color:'+atColor+'">· '+at+'</span></div>'
               + '<div style="font-size:10px;color:var(--text3)">'+d.shares.toLocaleString()+'주</div>'
               + '</div>'
               + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
