@@ -354,6 +354,11 @@ canvas{width:100%;display:block}
     <div class="inp-wrap"><input class="inp-num sim-inp" id="cur_age" type="number" value="45" min="20" max="80"/><span class="inp-unit">세</span></div>
   </div>
 
+  <div style="display:flex;align-items:center;gap:10px;background:var(--sur);border:.5px solid var(--bdr);border-radius:10px;padding:11px 14px">
+    <button onclick="syncFromFocusFlow()" style="flex-shrink:0;padding:8px 14px;border-radius:20px;border:.5px solid var(--acc);background:transparent;color:var(--acc);font-family:'Noto Serif KR',serif;font-size:12px;cursor:pointer;white-space:nowrap">🔗 재테크·배당 반영</button>
+    <span id="ffSyncStatus" style="font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut2);line-height:1.6">재테크·배당내역 탭 데이터를 불러와요</span>
+  </div>
+
   <div class="total-asset-box">
     <div class="ta-label">현재 총 자산</div>
     <div class="ta-value" id="totalAssetNow">—</div>
@@ -598,6 +603,7 @@ function switchTab(id,btn){
   document.querySelectorAll('.tab-pg').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tn').forEach(b=>b.classList.remove('on'));
   document.getElementById('tab-'+id).classList.add('on');btn.classList.add('on');
+  if(id==='retire' && typeof syncFromFocusFlow==='function') syncFromFocusFlow();
 }
 
 // LIFE CLOCK
@@ -1063,6 +1069,54 @@ function drawChart(rows){
   });
 }
 
+// ── 재테크(ff_investments)/배당내역(ff_dividends) 자동 연동 ──
+// FocusFlow 대시보드와 같은 사이트(도메인)에 있을 때만 localStorage가 공유되어 동작함
+function syncFromFocusFlow(){
+  const statusEl = document.getElementById('ffSyncStatus');
+  if (!statusEl) return;
+  let investments, dividends;
+  try {
+    investments = JSON.parse(localStorage.getItem('ff_investments')||'[]');
+    dividends = JSON.parse(localStorage.getItem('ff_dividends')||'[]');
+  } catch(e) {
+    statusEl.textContent = '데이터를 읽어오지 못했어요';
+    return;
+  }
+  if (!investments.length) {
+    statusEl.textContent = '재테크 탭에 등록된 보유 종목이 아직 없어요';
+    return;
+  }
+  const sumByType = type => investments
+    .filter(iv => (iv.acctType||'일반계좌') === type)
+    .reduce((s,iv) => s + iv.shares*iv.avgPrice, 0);
+  const gP = Math.round(sumByType('일반계좌')/10000);   // 만원 단위
+  const iCur = Math.round(sumByType('ISA')/10000);
+  const pExcl = Math.round(sumByType('연금저축')/10000);
+
+  // 최근 12개월 실제 배당금 합계 → 실효 배당률 역산 (일반계좌 원금 기준)
+  const now = new Date();
+  const last12Months = [];
+  for (let i=0;i<12;i++){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    last12Months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  }
+  const div12moWon = dividends.filter(d=>last12Months.includes(d.month)).reduce((s,d)=>s+d.amount,0);
+  const div12moM = div12moWon/10000; // 만원
+
+  const setAndFire = (id,val) => { const el=document.getElementById(id); if(el){ el.value=val; el.dispatchEvent(new Event('input')); } };
+  setAndFire('g_p', gP);
+  setAndFire('i_cur', iCur);
+  setAndFire('p_excl', pExcl);
+  if (gP > 0 && div12moWon > 0) {
+    setAndFire('g_yield', Math.round((div12moM/gP*100)*10)/10);
+  }
+
+  runSim();
+  const ts = now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
+  statusEl.innerHTML = '✓ 반영됨 ('+ts+') · 일반 '+fmtW(gP)+'원 · ISA '+fmtW(iCur)+'원 · 연금저축 '+fmtW(pExcl)+'원'
+    + '<br>연금 수익분(수익분 잔액)은 현재가 정보가 없어 수동 입력을 유지해요';
+}
+
 const SIM_INPUTS=['cur_age','g_p','g_yield','g_nav','g_fin_inc','i_cur','i_contrib','i_cc_pct','i_cc_yield','i_act_ret','i_cycle','p_excl','p_gain','p_cc_pct','p_cc_yield','p_act_ret','p_age','p_tax','extra_m','extra_yrs','exp','inf_rate','nps','nps_age','house','car','car_yr','exp_food','exp_mgmt','exp_loan','exp_tel','exp_car','exp_leisure','exp_med','exp_etc'];
 const SIM_KEY='life_sim_v2';
 function saveInputs(){
@@ -1081,6 +1135,7 @@ function loadInputs(){
   }catch(e){}
 }
 loadInputs();
+syncFromFocusFlow();
 runSim();
 
 // ════════════════════════════════════════════════════════════
@@ -1241,6 +1296,7 @@ async function lcSyncAutoDownloadOnLoad(){
   if (ok){
     try{
       loadInputs();
+      if (typeof syncFromFocusFlow === 'function') syncFromFocusFlow();
       runSim();
       if (typeof render === 'function') render();
     }catch(e){}
