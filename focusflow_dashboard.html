@@ -677,7 +677,7 @@ html, body {
     </div>
     <input class="modal-textarea" id="dv-stock-new" placeholder="새 종목명 입력 (예: SCHD)" style="display:none;min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
     <select class="modal-textarea" id="dv-accttype" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
-      <option value="일반계좌">일반계좌 (과세)</option>
+      <option value="일반계좌">일반계좌</option>
       <option value="ISA">ISA</option>
       <option value="연금저축">연금저축(IRP 포함)</option>
     </select>
@@ -705,7 +705,7 @@ html, body {
     <input class="modal-textarea" id="iv-stock-new" placeholder="새 종목명 입력 (예: SCHD)" style="display:none;min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
     <input class="modal-textarea" id="iv-account" placeholder="증권계좌 (예: 토스증권, 미래에셋)" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
     <select class="modal-textarea" id="iv-accttype" style="min-height:auto;padding:13px 14px;font-size:14px;margin-bottom:8px">
-      <option value="일반계좌">일반계좌 (과세)</option>
+      <option value="일반계좌">일반계좌</option>
       <option value="ISA">ISA</option>
       <option value="연금저축">연금저축(IRP 포함)</option>
     </select>
@@ -3018,7 +3018,8 @@ function tabHTML(tab) {
             const atColor = {'일반계좌':'var(--text3)','ISA':'#7a9ec4','연금저축':'#a98fd4'}[at]||'var(--text3)';
             return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--border);cursor:pointer" onclick="openDividendModal('+d.id+')">'
               + '<div style="min-width:0">'
-              + '<div style="font-size:13px;color:var(--text)">'+d.stock+' <span style="font-size:10px;color:'+atColor+'">· '+at+'</span></div>'
+              + '<div style="font-size:13px;color:var(--text)">'+d.stock+'</div>'
+              + '<div style="font-size:10px;color:'+atColor+';margin-top:2px">'+at+'</div>'
               + '<div style="font-size:10px;color:var(--text3)">'+d.shares.toLocaleString()+'주</div>'
               + '</div>'
               + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
@@ -3270,7 +3271,8 @@ function tabHTML(tab) {
           const at = a.acctType || '일반계좌';
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--border)">'
             +'<div style="min-width:0;cursor:pointer" onclick="openInvestModal('+a.id+')">'
-            +'<div style="font-size:12px;color:var(--text2)">'+a.account+' <span style="color:'+(acctTypeColor[at]||'var(--text3)')+'">· '+at+'</span></div>'
+            +'<div style="font-size:12px;color:var(--text2)">'+a.account+'</div>'
+            +'<div style="font-size:10px;color:'+(acctTypeColor[at]||'var(--text3)')+';margin-top:2px">'+at+'</div>'
             +'</div>'
             +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
             +'<span style="font-size:12px;color:var(--text);cursor:pointer" onclick="openInvestModal('+a.id+')">'+a.shares.toLocaleString()+'주 · '+a.avgPrice.toLocaleString()+'원</span>'
