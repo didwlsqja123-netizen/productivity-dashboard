@@ -300,16 +300,15 @@ html, body {
 .ledger-item.dragging { opacity: 0.85; background: rgba(255,255,255,0.06); transition: none; }
 .ledger-item.drag-over { background: rgba(255,255,255,0.05); }
 .ledger-drag-handle {
-  display: flex; flex-direction: column; gap: 3px; justify-content: center;
-  cursor: grab; padding: 10px 10px; margin: -10px 0; flex-shrink: 0; opacity: 0.55;
-  transition: opacity 0.15s; touch-action: none; -webkit-user-select: none; user-select: none;
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 38px; margin: -9px -4px -9px -8px; flex-shrink: 0;
+  border-radius: 8px; cursor: grab; touch-action: none;
+  -webkit-user-select: none; user-select: none;
+  color: var(--text2); font-size: 17px; line-height: 1; letter-spacing: -2px;
+  background: rgba(255,255,255,0.04);
+  transition: background 0.15s, color 0.15s;
 }
-.ledger-drag-handle:active { cursor: grabbing; opacity: 0.9; }
-.ledger-item:hover .ledger-drag-handle { opacity: 0.8; }
-.ledger-drag-handle span {
-  display: block; width: 12px; height: 1.5px;
-  background: var(--text2); border-radius: 2px;
-}
+.ledger-drag-handle:active { cursor: grabbing; background: rgba(255,255,255,0.10); color: var(--text); }
 .goal-dot.purple { background: #a78bfa; box-shadow: 0 0 6px rgba(167,139,250,0.5); }
 .goal-dot.red { background: #f87171; box-shadow: 0 0 6px rgba(248,113,113,0.5); }
 
@@ -1821,7 +1820,7 @@ function renderLedgerList(query) {
   container.innerHTML = filtered.map(function(e){
     var info = ledgerCategoryInfo(e.category);
     return '<div class="ledger-item" data-id="'+e.id+'" data-date="'+e.date+'" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">'
-      +'<div class="ledger-drag-handle" title="같은 날짜끼리 드래그해서 순서 변경"><span></span><span></span><span></span></div>'
+      +'<div class="ledger-drag-handle" title="같은 날짜끼리 드래그해서 순서 변경">⋮⋮</div>'
       +'<div style="display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer;flex:1" onclick="openLedgerModal('+e.id+')">'
       +'<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:'+info.color+'18;color:'+info.color+';border:1px solid '+info.color+'33;flex-shrink:0">'+info.label+'</span>'
       +'<div style="min-width:0">'
