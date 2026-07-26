@@ -905,9 +905,15 @@ function runSim(){
 
     const total=aG+aI+aPE+aPG;
     // 1년차(올해)만: "연 분배금" 표시값을 실제 수령분(1월~오늘, 일반계좌) + 남은 기간 예상분으로 합산
-    // 시뮬레이션 계산(surplusY, reinvestY, aG 등)은 원래의 예상치(gDistY)를 그대로 사용 — 표시값만 보정
+    // "총 수익(당해)" 표시값도 마찬가지로, 일반+ISA+연금저축 전체의 실제 수령 배당을 더해줌
+    // (NAV 상승분·액티브 운용수익은 실적 기록이 없어 예상치를 그대로 유지)
+    // 시뮬레이션 계산(surplusY, reinvestY, aG 등)은 원래의 예상치를 그대로 사용 — 표시값만 보정
     const actualDivG = (y===1) ? getActualDivYTD('일반계좌') : 0;
+    const actualDivI = (y===1) ? getActualDivYTD('ISA') : 0;
+    const actualDivP = (y===1) ? getActualDivYTD('연금저축') : 0;
+    const actualDivAll = actualDivG + actualDivI + actualDivP;
     const gDistYDisplay = (y===1) ? Math.round(actualDivG + gDistY) : Math.round(gDistY);
+    const totalEarnYDisplay = (y===1) ? Math.round(totalEarnY + actualDivAll) : Math.round(totalEarnY);
     rows.push({
       y, age, aG:Math.round(aG), aI:Math.round(aI),
       aPE:Math.round(aPE), aPG:Math.round(aPG), total:Math.round(total),
@@ -916,7 +922,9 @@ function runSim(){
       gDistY:gDistYDisplay,
       actualDivG: y===1 ? Math.round(actualDivG) : 0,
       projDivG: y===1 ? Math.round(gDistY) : 0,
-      totalEarnY:Math.round(totalEarnY)
+      totalEarnY:totalEarnYDisplay,
+      actualDivAll: y===1 ? Math.round(actualDivAll) : 0,
+      projTotalEarnY: y===1 ? Math.round(totalEarnY) : 0
     });
   }
 
@@ -952,16 +960,17 @@ function renderTable(rows, isaCycle, curAge, npsAge){
     const isISAYear=r.y%isaCycle===0;
     const isNPS=r.age===npsAge;
     const note=[];
-    if(r.y===1)note.push(`실제 ${fmtM(r.actualDivG)}+예상 ${fmtM(r.projDivG)}`);
+    if(r.y===1)note.push(`배당 실제 ${fmtM(r.actualDivAll)}(전계좌)+남은기간예상 반영`);
     if(isISAYear)note.push(`ISA→연금 ${fmtM(r.isaTransfer)}`);
     if(isNPS)note.push('국민연금 개시');
     if(r.age===gv('p_age'))note.push('연금 개시 연령');
     const surpColor=r.surplusY>=0?'var(--grn)':'var(--red)';
     const gDistTitle = r.y===1 ? `실제 수령 ${fmtM(r.actualDivG)}원 + 남은 기간 예상 ${fmtM(r.projDivG)}원` : '';
+    const totalEarnTitle = r.y===1 ? `예상 총수익 ${fmtM(r.projTotalEarnY)}원(NAV·액티브 포함) + 전계좌 실제 배당 수령분 ${fmtM(r.actualDivAll)}원` : '';
 
     html+=`<tr class="${isISAYear?'isa-row':''}">
       <td>${r.age}세</td>
-      <td style="color:var(--pur);font-weight:600">+${fmtM(r.totalEarnY)}</td>
+      <td style="color:var(--pur);font-weight:600"${totalEarnTitle?` title="${totalEarnTitle}"`:''}>+${fmtM(r.totalEarnY)}${r.y===1?'<span style="color:var(--mut2);font-size:9px">*</span>':''}</td>
       <td style="color:var(--acc);font-weight:500"${gDistTitle?` title="${gDistTitle}"`:''}>${fmtM(r.gDistY)}${r.y===1?'<span style="color:var(--mut2);font-size:9px">*</span>':''}</td>
       <td style="color:var(--red)">${fmtM(r.expY)}</td>
       <td style="color:${surpColor}">${r.surplusY>=0?'+':''}${fmtM(r.surplusY)}</td>
@@ -974,7 +983,7 @@ function renderTable(rows, isaCycle, curAge, npsAge){
     </tr>`;
   });
   html+='</tbody></table></div>';
-  html+='<div style="font-size:10px;color:var(--mut2);margin-top:6px">* 올해 연 분배금 = 실제 수령분(1월~오늘, 일반계좌) + 남은 기간 예상분 (마우스를 올리면 내역 확인 가능)</div>';
+  html+='<div style="font-size:10px;color:var(--mut2);margin-top:6px">* 올해(1년차)만 실제 수령분 + 남은 기간 예상분을 합산해 표시 — 연 분배금: 일반계좌 배당만 / 총 수익(당해): 일반+ISA+연금저축 실제 배당 전체 + 예상 총수익(NAV·액티브 포함). 마우스를 올리면 내역 확인 가능</div>';
   el.innerHTML=html;
 }
 
