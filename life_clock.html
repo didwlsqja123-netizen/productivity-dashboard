@@ -673,6 +673,17 @@ const fmtN=n=>Math.round(n).toLocaleString('ko-KR');
 const fmtW=n=>{const a=Math.abs(n),s=n<0?'-':'';if(a>=100000000)return s+parseFloat((a/100000000).toFixed(3))+'억';if(a>=10000)return s+parseFloat((a/10000).toFixed(3))+'억';return s+fmtN(a)+'만';};
 const fmtM=n=>{const a=Math.abs(n),s=n<0?'-':'';if(a>=10000)return s+parseFloat((a/10000).toFixed(3))+'억';return s+fmtN(a)+'만';};
 const fmtWon=v=>Math.round(v*10000).toLocaleString('ko-KR')+'원';
+// 올해(1년차) "연 분배금" 표시용: 이미 실제로 받은 배당(1월~오늘, 일반계좌) + 남은 기간 예상 배당을 합쳐서 보여줌
+// ※ 시뮬레이션 내부 현금흐름/재투자 계산(reinvestY, aG 등)은 건드리지 않음 — 화면 표시값만 보정
+function getActualDivYTD(acctType){
+  try{
+    const divs = JSON.parse(localStorage.getItem('ff_dividends')||'[]');
+    const yk = String(new Date().getFullYear());
+    return divs
+      .filter(d => d.month && d.month.slice(0,4)===yk && (d.acctType||'일반계좌')===acctType)
+      .reduce((s,d)=>s+d.amount, 0) / 10000; // 만원 단위로 변환
+  }catch(e){ return 0; }
+}
 
 function propSc(t){
   if(t<=0)return 0;if(t<=450)return 22;if(t<=900)return 44;if(t<=1350)return 66;
@@ -893,12 +904,18 @@ function runSim(){
     }
 
     const total=aG+aI+aPE+aPG;
+    // 1년차(올해)만: "연 분배금" 표시값을 실제 수령분(1월~오늘, 일반계좌) + 남은 기간 예상분으로 합산
+    // 시뮬레이션 계산(surplusY, reinvestY, aG 등)은 원래의 예상치(gDistY)를 그대로 사용 — 표시값만 보정
+    const actualDivG = (y===1) ? getActualDivYTD('일반계좌') : 0;
+    const gDistYDisplay = (y===1) ? Math.round(actualDivG + gDistY) : Math.round(gDistY);
     rows.push({
       y, age, aG:Math.round(aG), aI:Math.round(aI),
       aPE:Math.round(aPE), aPG:Math.round(aPG), total:Math.round(total),
       expY:Math.round(expY), surplusY:Math.round(surplusY),
       isaTransfer:Math.round(isaTransfer),
-      gDistY:Math.round(gDistY),
+      gDistY:gDistYDisplay,
+      actualDivG: y===1 ? Math.round(actualDivG) : 0,
+      projDivG: y===1 ? Math.round(gDistY) : 0,
       totalEarnY:Math.round(totalEarnY)
     });
   }
@@ -935,15 +952,17 @@ function renderTable(rows, isaCycle, curAge, npsAge){
     const isISAYear=r.y%isaCycle===0;
     const isNPS=r.age===npsAge;
     const note=[];
+    if(r.y===1)note.push(`실제 ${fmtM(r.actualDivG)}+예상 ${fmtM(r.projDivG)}`);
     if(isISAYear)note.push(`ISA→연금 ${fmtM(r.isaTransfer)}`);
     if(isNPS)note.push('국민연금 개시');
     if(r.age===gv('p_age'))note.push('연금 개시 연령');
     const surpColor=r.surplusY>=0?'var(--grn)':'var(--red)';
-    
+    const gDistTitle = r.y===1 ? `실제 수령 ${fmtM(r.actualDivG)}원 + 남은 기간 예상 ${fmtM(r.projDivG)}원` : '';
+
     html+=`<tr class="${isISAYear?'isa-row':''}">
       <td>${r.age}세</td>
       <td style="color:var(--pur);font-weight:600">+${fmtM(r.totalEarnY)}</td>
-      <td style="color:var(--acc);font-weight:500">${fmtM(r.gDistY)}</td>
+      <td style="color:var(--acc);font-weight:500"${gDistTitle?` title="${gDistTitle}"`:''}>${fmtM(r.gDistY)}${r.y===1?'<span style="color:var(--mut2);font-size:9px">*</span>':''}</td>
       <td style="color:var(--red)">${fmtM(r.expY)}</td>
       <td style="color:${surpColor}">${r.surplusY>=0?'+':''}${fmtM(r.surplusY)}</td>
       <td style="color:var(--acc)">${fmtM(r.aG)}</td>
@@ -955,6 +974,7 @@ function renderTable(rows, isaCycle, curAge, npsAge){
     </tr>`;
   });
   html+='</tbody></table></div>';
+  html+='<div style="font-size:10px;color:var(--mut2);margin-top:6px">* 올해 연 분배금 = 실제 수령분(1월~오늘, 일반계좌) + 남은 기간 예상분 (마우스를 올리면 내역 확인 가능)</div>';
   el.innerHTML=html;
 }
 
