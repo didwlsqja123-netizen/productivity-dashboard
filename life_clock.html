@@ -706,6 +706,17 @@ function updateExpSum(){
 }
 
 function runSim(){
+  // 올해 남은 기간 비율 (예: 7월이면 남은 개월 기준 분수) — 재테크 잔액이 "오늘 기준" 스냅샷이라
+  // 첫 번째 시뮬레이션 구간(1년차)은 12개월 전체가 아니라 올해 12/31까지 남은 기간만 반영
+  const firstYearFraction = (function(){
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+    const msPerDay = 86400000;
+    const totalDays = Math.round((yearEnd - yearStart)/msPerDay) + 1;
+    const daysLeft = Math.max(1, Math.round((yearEnd - now)/msPerDay));
+    return Math.min(1, daysLeft/totalDays);
+  })();
   const curAge=gv('cur_age')||45;
   const gP=gv('g_p'), gYield=gv('g_yield')/100, gNav=gv('g_nav')/100, gFinInc=gv('g_fin_inc');
   const iCur=gv('i_cur'), iContrib=gv('i_contrib');
@@ -738,8 +749,12 @@ function runSim(){
   const pBlendEl=document.getElementById('p_blend_display');
   if(pBlendEl)pBlendEl.textContent=(pBlend*100).toFixed(1)+'% (커버드콜 '+Math.round(pCcPct*100)+'% + 액티브 '+Math.round(pActPct*100)+'%)';
 
-  // ISA 만기 예상 전환액
-  const isaTransferPreview=iCur*(1+iRet)**isaCycle + iContrib*((1+iRet)**isaCycle-1)/iRet*(1+iRet);
+  // ISA 만기 예상 전환액 (올해분은 남은 기간만큼만 성장 반영, 그다음 해부터 온전한 1년씩)
+  let isaTransferPreview = iCur;
+  for (let yy=1; yy<=isaCycle; yy++){
+    const frac = (yy===1) ? firstYearFraction : 1;
+    isaTransferPreview = isaTransferPreview*(1+iRet*frac) + iContrib;
+  }
   const iTransEl=document.getElementById('i_transfer_display');
   if(iTransEl)iTransEl.textContent=fmtW(Math.round(isaTransferPreview))+'원 ('+isaCycle+'년 후)';
 
@@ -812,15 +827,16 @@ function runSim(){
 
   for(let y=1;y<=years;y++){
     const age=curAge+y;
-    const npsY=age>=npsAge?nps*12:0;
-    const addY=(y<=extraYrs?extraM:0)*12;
-    const insY=insM*12;
+    const yFrac = (y===1) ? firstYearFraction : 1; // 1년차만 올해 남은 기간 비율 적용
+    const npsY=(age>=npsAge?nps*12:0)*yFrac;
+    const addY=(y<=extraYrs?extraM:0)*12*yFrac;
+    const insY=insM*12*yFrac;
 
-    // 물가상승률 반영된 당해 연도 생활비
-    const expY=exp*12*Math.pow(1+infRate, y-1);
+    // 물가상승률 반영된 당해 연도 생활비 (1년차는 올해 남은 기간만큼만)
+    const expY=exp*12*Math.pow(1+infRate, y-1)*yFrac;
 
     // ── STEP 1: 현금흐름 및 생활비 부족분 산출 ──
-    const gDistY=aG*gYield;
+    const gDistY=aG*gYield*yFrac;
     const cashIn=gDistY+npsY;
     const cashOut=expY+insY;
     const surplusY=cashIn-cashOut;
@@ -834,17 +850,17 @@ function runSim(){
     }
 
     // ── STEP 2: 각 계좌 당해 연도 순수 수익 계산 (자산 이동 전) ──
-    const gEarnY = aG * (gYield + gNav);               // 일반계좌: 배당 + NAV 상승
-    const iEarnY = aI * iRet;                           // ISA: 내부 복리 수익
-    const totalPEarn = (aPE + aPG - pWdY / 2) * pRet;  // 연금저축: 생활비 차감 정밀 반영
+    const gEarnY = aG * (gYield + gNav) * yFrac;         // 일반계좌: 배당 + NAV 상승
+    const iEarnY = aI * iRet * yFrac;                    // ISA: 내부 복리 수익
+    const totalPEarn = (aPE + aPG - pWdY / 2) * pRet * yFrac;  // 연금저축: 생활비 차감 정밀 반영
     let totalEarnY = gEarnY + iEarnY + totalPEarn;      // 당해 총 수익 (지표·실제 일치)
 
     // ── STEP 3: 자산 증감 적용 ──
     // 일반계좌
-    aG = aG * (1 + gNav) + reinvestY + addY;
+    aG = aG * (1 + gNav*yFrac) + reinvestY + addY;
 
-    // ISA: 복리 누적 + 납입
-    aI = aI * (1 + iRet) + iContrib;
+    // ISA: 복리 누적 + 납입 (성장은 남은 기간만큼만, 납입 한도는 올해도 전액 가능하다고 가정)
+    aI = aI * (1 + iRet*yFrac) + iContrib;
     iCyclePrin += iContrib;
 
     // 연금저축: 수익 누적 → 생활비 인출
