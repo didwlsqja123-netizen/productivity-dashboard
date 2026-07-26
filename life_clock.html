@@ -1094,38 +1094,70 @@ function syncFromFocusFlow(){
   const iCur = Math.round(sumByType('ISA')/10000);
   const pExcl = Math.round(sumByType('연금저축')/10000);
 
-  // 최근 12개월 실제 배당금 합계 → 계좌별 실효 배당률 역산 (각 계좌 원금 기준)
+  // 최근 12개월 실제 배당금 → "종목별" 실효 배당률 역산 (계좌구분과 무관하게 그 종목 전체 기준)
+  // 이렇게 하면 같은 종목을 계좌 간에 이전(예: 일반계좌→연금저축)해도 배당률 계산이 흔들리지 않음
   const now = new Date();
   const last12Months = [];
   for (let i=0;i<12;i++){
     const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
     last12Months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
   }
-  const div12moByType = type => dividends
-    .filter(d=>last12Months.includes(d.month) && (d.acctType||'일반계좌')===type)
-    .reduce((s,d)=>s+d.amount,0);
-  const gDivWon = div12moByType('일반계좌');
-  const iDivWon = div12moByType('ISA');
-  const pDivWon = div12moByType('연금저축');
+  const stockPrincipal = {};
+  investments.forEach(iv=>{
+    stockPrincipal[iv.stock] = (stockPrincipal[iv.stock]||0) + iv.shares*iv.avgPrice;
+  });
+  const stockDiv12mo = {};
+  const stockMonthsSeen = {};
+  dividends.filter(d=>last12Months.includes(d.month)).forEach(d=>{
+    stockDiv12mo[d.stock] = (stockDiv12mo[d.stock]||0) + d.amount;
+    if (!stockMonthsSeen[d.stock]) stockMonthsSeen[d.stock] = new Set();
+    stockMonthsSeen[d.stock].add(d.month);
+  });
+  const stockYield = {};
+  Object.keys(stockPrincipal).forEach(stock=>{
+    const principal = stockPrincipal[stock];
+    const div = stockDiv12mo[stock]||0;
+    const monthsCount = stockMonthsSeen[stock] ? stockMonthsSeen[stock].size : 0;
+    // 아직 12개월치가 다 안 쌓인 종목은, 실제로 배당 기록이 있는 개월 수만큼만 나눠서 연환산
+    if (principal>0 && div>0 && monthsCount>0) {
+      const annualizedDiv = div * (12/monthsCount);
+      stockYield[stock] = annualizedDiv/principal*100;
+    }
+  });
+  // 계좌구분별로는, 그 계좌에 지금 들어있는 종목들의 "종목별 배당률"을 원금 비중으로 가중평균
+  function blendedYieldForType(type){
+    let weightedSum = 0, weightTotal = 0;
+    investments.filter(iv => (iv.acctType||'일반계좌') === type).forEach(iv=>{
+      const y = stockYield[iv.stock];
+      if (y === undefined) return;
+      const principal = iv.shares*iv.avgPrice;
+      weightedSum += principal*y;
+      weightTotal += principal;
+    });
+    return weightTotal>0 ? weightedSum/weightTotal : null;
+  }
+  const gYield = blendedYieldForType('일반계좌');
+  const iYield = blendedYieldForType('ISA');
+  const pYield = blendedYieldForType('연금저축');
 
   const setAndFire = (id,val) => { const el=document.getElementById(id); if(el){ el.value=val; el.dispatchEvent(new Event('input')); } };
   setAndFire('g_p', gP);
   setAndFire('i_cur', iCur);
   setAndFire('p_excl', pExcl);
-  if (gP > 0 && gDivWon > 0) {
-    setAndFire('g_yield', Math.round((gDivWon/10000/gP*100)*10)/10);
+  if (gP > 0 && gYield !== null) {
+    setAndFire('g_yield', Math.round(gYield*10)/10);
   }
-  if (iCur > 0 && iDivWon > 0) {
-    setAndFire('i_cc_yield', Math.round((iDivWon/10000/iCur*100)*10)/10);
+  if (iCur > 0 && iYield !== null) {
+    setAndFire('i_cc_yield', Math.round(iYield*10)/10);
   }
-  if (pExcl > 0 && pDivWon > 0) {
-    setAndFire('p_cc_yield', Math.round((pDivWon/10000/pExcl*100)*10)/10);
+  if (pExcl > 0 && pYield !== null) {
+    setAndFire('p_cc_yield', Math.round(pYield*10)/10);
   }
 
   runSim();
   const ts = now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
-  const yieldNote = (iCur>0 && iDivWon>0) || (pExcl>0 && pDivWon>0)
-    ? '<br>ISA·연금저축 배당률도 반영됨 (커버드콜 비율 100%가 아니면 부정확할 수 있어요)'
+  const yieldNote = (iCur>0 && iYield!==null) || (pExcl>0 && pYield!==null)
+    ? '<br>ISA·연금저축 배당률도 반영됨 (종목별 최근 12개월 배당률 기준 · 계좌 이전해도 안 흔들림)'
     : '';
   statusEl.innerHTML = '✓ 반영됨 ('+ts+') · 일반 '+fmtW(gP)+'원 · ISA '+fmtW(iCur)+'원 · 연금저축 '+fmtW(pExcl)+'원'
     + yieldNote
