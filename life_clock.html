@@ -924,7 +924,11 @@ function runSim(){
       projDivG: y===1 ? Math.round(gDistY) : 0,
       totalEarnY:totalEarnYDisplay,
       actualDivAll: y===1 ? Math.round(actualDivAll) : 0,
-      projTotalEarnY: y===1 ? Math.round(totalEarnY) : 0
+      projTotalEarnY: y===1 ? Math.round(totalEarnY) : 0,
+      gEarnY: y===1 ? Math.round(gEarnY) : 0,
+      iEarnY: y===1 ? Math.round(iEarnY) : 0,
+      totalPEarn: y===1 ? Math.round(totalPEarn) : 0,
+      pWdY: y===1 ? Math.round(pWdY) : 0
     });
   }
 
@@ -960,13 +964,13 @@ function renderTable(rows, isaCycle, curAge, npsAge){
     const isISAYear=r.y%isaCycle===0;
     const isNPS=r.age===npsAge;
     const note=[];
-    if(r.y===1)note.push(`배당 실제 ${fmtM(r.actualDivAll)}(전계좌)+남은기간예상 반영`);
+    if(r.y===1)note.push(`일반${fmtM(r.gEarnY)}+ISA${fmtM(r.iEarnY)}+연금${fmtM(r.totalPEarn)}(예상)+실배당${fmtM(r.actualDivAll)}`);
     if(isISAYear)note.push(`ISA→연금 ${fmtM(r.isaTransfer)}`);
     if(isNPS)note.push('국민연금 개시');
     if(r.age===gv('p_age'))note.push('연금 개시 연령');
     const surpColor=r.surplusY>=0?'var(--grn)':'var(--red)';
     const gDistTitle = r.y===1 ? `실제 수령 ${fmtM(r.actualDivG)}원 + 남은 기간 예상 ${fmtM(r.projDivG)}원` : '';
-    const totalEarnTitle = r.y===1 ? `예상 총수익 ${fmtM(r.projTotalEarnY)}원(NAV·액티브 포함) + 전계좌 실제 배당 수령분 ${fmtM(r.actualDivAll)}원` : '';
+    const totalEarnTitle = r.y===1 ? `[예상] 일반 ${fmtM(r.gEarnY)} + ISA ${fmtM(r.iEarnY)} + 연금 ${fmtM(r.totalPEarn)}${r.pWdY>0?' (생활비 인출 '+fmtM(r.pWdY)+' 반영)':''} = 예상소계 ${fmtM(r.projTotalEarnY)}\n[실제] 전계좌 배당 ${fmtM(r.actualDivAll)}\n[합계] ${fmtM(r.totalEarnY)}` : '';
 
     html+=`<tr class="${isISAYear?'isa-row':''}">
       <td>${r.age}세</td>
