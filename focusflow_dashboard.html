@@ -3506,6 +3506,7 @@ function renderTab(tab) {
     if(tab==='daily')   { renderTasks(); renderGoals(); }
     if(tab==='routine') { renderHabitsTab(); }
     if(tab==='project') { renderProjects(); }
+    if(tab==='ledger')  { renderLedgerList(document.getElementById('ledger-search') ? document.getElementById('ledger-search').value : ''); }
   }, 80);
 }
 
