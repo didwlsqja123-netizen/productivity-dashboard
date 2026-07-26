@@ -820,13 +820,15 @@ function runSim(){
   }
 
   // ===== 연도별 자산 시뮬레이션 =====
-  const years = Math.max(1, 85 - curAge);
+  // 1년차(y=1)는 "올해 남은 기간"이라 아직 나이가 그대로(curAge)이고,
+  // 2년차부터 온전한 1년씩 지나면서 나이가 하나씩 올라감
+  const years = Math.max(1, 86 - curAge);
   const rows=[];
   let aG=gP, aI=iCur, aPE=pExcl, aPG=pGain;
   let iCyclePrin = iCur; // ISA 사이클별 원금 추적용
 
   for(let y=1;y<=years;y++){
-    const age=curAge+y;
+    const age=(y===1) ? curAge : curAge+(y-1);
     const yFrac = (y===1) ? firstYearFraction : 1; // 1년차만 올해 남은 기간 비율 적용
     const npsY=(age>=npsAge?nps*12:0)*yFrac;
     const addY=(y<=extraYrs?extraM:0)*12*yFrac;
