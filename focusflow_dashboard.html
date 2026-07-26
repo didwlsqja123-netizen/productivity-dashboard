@@ -3299,6 +3299,44 @@ function tabHTML(tab) {
         +'</div>';
     }
 
+    // '전체' 탭 전용: 계좌구분(일반계좌/ISA/연금저축)별로 묶어서, 각 계좌구분 안에서 종목별 보유 주식수를 보여줌 (두 사람 합산)
+    function invAllByAcctType() {
+      const types = ['일반계좌','ISA','연금저축'];
+      const typeColor = {'일반계좌':'var(--accent2)','ISA':'#7a9ec4','연금저축':'#a98fd4'};
+      return types.map(function(type){
+        const rows = investments.filter(function(iv){ return (iv.acctType||'일반계좌')===type; });
+        if(!rows.length) return '';
+        const byStock = {};
+        rows.forEach(function(iv){
+          if(!byStock[iv.stock]) byStock[iv.stock] = [];
+          byStock[iv.stock].push(iv);
+        });
+        const stockNames = Object.keys(byStock);
+        const typeTotal = rows.reduce(function(s,iv){ return s+iv.shares*iv.avgPrice; },0);
+        const stockCards = stockNames.map(function(stock){
+          const accs = byStock[stock];
+          const totalShares = accs.reduce(function(s,a){ return s+a.shares; },0);
+          const totalCost = accs.reduce(function(s,a){ return s+a.shares*a.avgPrice; },0);
+          const weightedAvg = totalShares>0 ? Math.round(totalCost/totalShares) : 0;
+          const personBreak = accs.map(function(a){ return a.person+' '+a.shares.toLocaleString()+'주'; }).join(' · ');
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border)">'
+            +'<div style="min-width:0;flex:1">'
+            +'<div style="font-size:'+fitFontSize(stock,13,12)+'px;color:var(--text);word-break:break-all">'+stock+'</div>'
+            +'<div style="font-size:10px;color:var(--text3);margin-top:2px">'+personBreak+' · 평단가 '+weightedAvg.toLocaleString()+'원</div>'
+            +'</div>'
+            +'<span style="font-size:13px;font-weight:600;color:var(--accent2);flex-shrink:0;margin-left:8px">'+totalShares.toLocaleString()+'주</span>'
+            +'</div>';
+        }).join('');
+        return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px">'
+          +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
+          +'<span style="font-size:13px;font-weight:600;color:'+(typeColor[type]||'var(--text)')+'">'+type+'</span>'
+          +'<span style="font-size:12px;color:var(--text2)">'+typeTotal.toLocaleString()+'원</span>'
+          +'</div>'
+          + stockCards
+          + '</div>';
+      }).join('');
+    }
+
     return `
     <div class="content-block" style="margin-bottom:0">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
@@ -3316,7 +3354,7 @@ function tabHTML(tab) {
         }).join('')}
       </div>
       ${invDonutBlock(investPersonTab)}
-      ${investPersonTab==='ALL' ? '' : invPersonBlock(investPersonTab)}
+      ${investPersonTab==='ALL' ? invAllByAcctType() : invPersonBlock(investPersonTab)}
     </div>`;
   }
 
