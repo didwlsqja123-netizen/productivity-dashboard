@@ -294,6 +294,22 @@ html, body {
 .goal-dot.blue { background: #60a5fa; box-shadow: 0 0 6px rgba(96,165,250,0.5); }
 .goal-dot.green { background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,0.5); }
 .goal-dot.yellow { background: #fbbf24; box-shadow: 0 0 6px rgba(251,191,36,0.5); }
+
+/* Ledger items (같은 날짜끼리 드래그 정렬) */
+.ledger-item { position: relative; transition: background 0.15s, opacity 0.15s; border-radius: 6px; }
+.ledger-item.dragging { opacity: 0.85; background: rgba(255,255,255,0.06); transition: none; }
+.ledger-item.drag-over { background: rgba(255,255,255,0.05); }
+.ledger-drag-handle {
+  display: flex; flex-direction: column; gap: 3px; justify-content: center;
+  cursor: grab; padding: 2px 6px; flex-shrink: 0; opacity: 0.4;
+  transition: opacity 0.15s; touch-action: none;
+}
+.ledger-drag-handle:active { cursor: grabbing; }
+.ledger-item:hover .ledger-drag-handle { opacity: 0.6; }
+.ledger-drag-handle span {
+  display: block; width: 12px; height: 1.5px;
+  background: var(--text2); border-radius: 2px;
+}
 .goal-dot.purple { background: #a78bfa; box-shadow: 0 0 6px rgba(167,139,250,0.5); }
 .goal-dot.red { background: #f87171; box-shadow: 0 0 6px rgba(248,113,113,0.5); }
 
@@ -1794,17 +1810,19 @@ function renderLedgerList(query) {
   const mk = ledgerViewMonth;
   const monthEntries = ledgerEntries.filter(e => ledgerMonthKey(e.date) === mk);
   const q = (query||'').trim().toLowerCase();
+  function ledgerOrderOf(e){ return (typeof e.order === 'number') ? e.order : -e.id; }
   const filtered = monthEntries
     .filter(e => !q || (e.desc||'').toLowerCase().includes(q) || ledgerCategoryInfo(e.category).label.includes(q))
-    .sort((a,b) => b.date.localeCompare(a.date) || b.id-a.id);
+    .sort((a,b) => b.date.localeCompare(a.date) || ledgerOrderOf(a)-ledgerOrderOf(b));
   if(!filtered.length) {
     container.innerHTML = '<div style="font-size:13px;color:var(--text3);text-align:center;padding:20px 0">'+(q?'검색 결과가 없어요':'이 달엔 등록된 내역이 없어요')+'</div>';
     return;
   }
   container.innerHTML = filtered.map(function(e){
     var info = ledgerCategoryInfo(e.category);
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">'
-      +'<div style="display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer" onclick="openLedgerModal('+e.id+')">'
+    return '<div class="ledger-item" data-id="'+e.id+'" data-date="'+e.date+'" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">'
+      +'<div class="ledger-drag-handle" title="같은 날짜끼리 드래그해서 순서 변경"><span></span><span></span><span></span></div>'
+      +'<div style="display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer;flex:1" onclick="openLedgerModal('+e.id+')">'
       +'<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:'+info.color+'18;color:'+info.color+';border:1px solid '+info.color+'33;flex-shrink:0">'+info.label+'</span>'
       +'<div style="min-width:0">'
       +'<div style="font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(e.desc||'(내용 없음)')+(e.fromRecurring?' <span style="color:var(--text3);font-size:10px">🔁</span>':'')+'</div>'
@@ -1815,6 +1833,76 @@ function renderLedgerList(query) {
       +'<span onclick="deleteLedgerEntry('+e.id+')" style="color:var(--text3);cursor:pointer;font-size:15px;padding:2px 5px" onmouseover="this.style.color=\'#f87171\'" onmouseout="this.style.color=\'var(--text3)\'">×</span>'
       +'</div></div>';
   }).join('');
+
+  // 같은 날짜 항목끼리만 드래그로 순서 변경 (Pointer Events 기반 — 마우스/터치 모두 지원)
+  let dragItem = null, dragId = null, dragDate = null, startY = 0;
+
+  function sameDateItems() {
+    return [...container.querySelectorAll('.ledger-item')].filter(i => i.dataset.date === dragDate);
+  }
+
+  function onPointerMove(e) {
+    if(!dragItem) return;
+    e.preventDefault();
+    const dy = e.clientY - startY;
+    dragItem.style.transform = 'translateY('+dy+'px)';
+    const items = sameDateItems();
+    const overItem = items.find(i => {
+      if(i === dragItem) return false;
+      const r = i.getBoundingClientRect();
+      return e.clientY > r.top && e.clientY < r.bottom;
+    });
+    items.forEach(i => i.classList.remove('drag-over'));
+    if(overItem) overItem.classList.add('drag-over');
+  }
+
+  function onPointerUp(e) {
+    if(!dragItem) return;
+    document.removeEventListener('pointermove', onPointerMove);
+    document.removeEventListener('pointerup', onPointerUp);
+
+    const items = sameDateItems();
+    const overItem = items.find(i => {
+      if(i === dragItem) return false;
+      const r = i.getBoundingClientRect();
+      return e.clientY > r.top && e.clientY < r.bottom;
+    });
+
+    dragItem.classList.remove('dragging');
+    dragItem.style.transform = '';
+    items.forEach(i => i.classList.remove('drag-over'));
+
+    if(overItem) {
+      const sameDateEntries = filtered.filter(x => x.date === dragDate);
+      const fromIdx = sameDateEntries.findIndex(x => x.id === dragId);
+      const toIdx = sameDateEntries.findIndex(x => x.id === Number(overItem.dataset.id));
+      if(fromIdx>=0 && toIdx>=0 && fromIdx!==toIdx) {
+        const [moved] = sameDateEntries.splice(fromIdx, 1);
+        sameDateEntries.splice(toIdx, 0, moved);
+        sameDateEntries.forEach((x, idx) => { x.order = idx; });
+        save(LS.ledger, ledgerEntries);
+      }
+    }
+    dragItem = null; dragId = null; dragDate = null;
+    const searchInput = document.getElementById('ledger-search');
+    renderLedgerList(searchInput ? searchInput.value : '');
+  }
+
+  container.querySelectorAll('.ledger-drag-handle').forEach(handle => {
+    handle.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const item = handle.closest('.ledger-item');
+      dragItem = item;
+      dragId = Number(item.dataset.id);
+      dragDate = item.dataset.date;
+      startY = e.clientY;
+      item.classList.add('dragging');
+      item.style.zIndex = '10';
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp);
+    });
+  });
 }
 
 function importFromExcel() {
@@ -3318,11 +3406,14 @@ function tabHTML(tab) {
           const totalShares = accs.reduce(function(s,a){ return s+a.shares; },0);
           const totalCost = accs.reduce(function(s,a){ return s+a.shares*a.avgPrice; },0);
           const weightedAvg = totalShares>0 ? Math.round(totalCost/totalShares) : 0;
-          const personBreak = accs.map(function(a){ return a.person+' '+a.shares.toLocaleString()+'주'; }).join(' · ');
+          const byPerson = {};
+          accs.forEach(function(a){ byPerson[a.person] = (byPerson[a.person]||0) + a.shares; });
+          const personBreak = Object.keys(byPerson).map(function(p){ return p+' '+byPerson[p].toLocaleString()+'주'; }).join(' · ');
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border)">'
             +'<div style="min-width:0;flex:1">'
             +'<div style="font-size:'+fitFontSize(stock,13,12)+'px;color:var(--text);word-break:break-all">'+stock+'</div>'
-            +'<div style="font-size:10px;color:var(--text3);margin-top:2px">'+personBreak+' · 평단가 '+weightedAvg.toLocaleString()+'원</div>'
+            +'<div style="font-size:10px;color:var(--text3);margin-top:2px">'+personBreak+'</div>'
+            +'<div style="font-size:10px;color:var(--text3);margin-top:2px">평단가 '+weightedAvg.toLocaleString()+'원</div>'
             +'</div>'
             +'<span style="font-size:13px;font-weight:600;color:var(--accent2);flex-shrink:0;margin-left:8px">'+totalShares.toLocaleString()+'주</span>'
             +'</div>';
