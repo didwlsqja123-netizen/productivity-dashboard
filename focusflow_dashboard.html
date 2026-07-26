@@ -301,11 +301,11 @@ html, body {
 .ledger-item.drag-over { background: rgba(255,255,255,0.05); }
 .ledger-drag-handle {
   display: flex; flex-direction: column; gap: 3px; justify-content: center;
-  cursor: grab; padding: 2px 6px; flex-shrink: 0; opacity: 0.4;
-  transition: opacity 0.15s; touch-action: none;
+  cursor: grab; padding: 10px 10px; margin: -10px 0; flex-shrink: 0; opacity: 0.55;
+  transition: opacity 0.15s; touch-action: none; -webkit-user-select: none; user-select: none;
 }
-.ledger-drag-handle:active { cursor: grabbing; }
-.ledger-item:hover .ledger-drag-handle { opacity: 0.6; }
+.ledger-drag-handle:active { cursor: grabbing; opacity: 0.9; }
+.ledger-item:hover .ledger-drag-handle { opacity: 0.8; }
 .ledger-drag-handle span {
   display: block; width: 12px; height: 1.5px;
   background: var(--text2); border-radius: 2px;
@@ -1835,7 +1835,7 @@ function renderLedgerList(query) {
   }).join('');
 
   // 같은 날짜 항목끼리만 드래그로 순서 변경 (Pointer Events 기반 — 마우스/터치 모두 지원)
-  let dragItem = null, dragId = null, dragDate = null, startY = 0;
+  let dragItem = null, dragId = null, dragDate = null, startY = 0, activeHandle = null;
 
   function sameDateItems() {
     return [...container.querySelectorAll('.ledger-item')].filter(i => i.dataset.date === dragDate);
@@ -1858,8 +1858,12 @@ function renderLedgerList(query) {
 
   function onPointerUp(e) {
     if(!dragItem) return;
-    document.removeEventListener('pointermove', onPointerMove);
-    document.removeEventListener('pointerup', onPointerUp);
+    if(activeHandle) {
+      activeHandle.removeEventListener('pointermove', onPointerMove);
+      activeHandle.removeEventListener('pointerup', onPointerUp);
+      activeHandle.removeEventListener('pointercancel', onPointerUp);
+      try { activeHandle.releasePointerCapture(e.pointerId); } catch(err) {}
+    }
 
     const items = sameDateItems();
     const overItem = items.find(i => {
@@ -1883,7 +1887,7 @@ function renderLedgerList(query) {
         save(LS.ledger, ledgerEntries);
       }
     }
-    dragItem = null; dragId = null; dragDate = null;
+    dragItem = null; dragId = null; dragDate = null; activeHandle = null;
     const searchInput = document.getElementById('ledger-search');
     renderLedgerList(searchInput ? searchInput.value : '');
   }
@@ -1899,8 +1903,11 @@ function renderLedgerList(query) {
       startY = e.clientY;
       item.classList.add('dragging');
       item.style.zIndex = '10';
-      document.addEventListener('pointermove', onPointerMove);
-      document.addEventListener('pointerup', onPointerUp);
+      activeHandle = handle;
+      try { handle.setPointerCapture(e.pointerId); } catch(err) {}
+      handle.addEventListener('pointermove', onPointerMove);
+      handle.addEventListener('pointerup', onPointerUp);
+      handle.addEventListener('pointercancel', onPointerUp);
     });
   });
 }
