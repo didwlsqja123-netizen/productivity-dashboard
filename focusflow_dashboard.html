@@ -1504,14 +1504,36 @@ async function syncFetchRemotePayload(silent) {
 // 가져온 원격 payload를 실제 localStorage에 반영 (이 시점부터 "덮어쓰기"가 발생)
 function syncApplyPayload(payload) {
   if (!payload) return false;
-  SYNC_DATA_KEYS.forEach(k => { if (payload[k] !== undefined) localStorage.setItem(k, payload[k]); });
-  if (payload._syncedAt) localStorage.setItem(SYNC_LAST_KEY, payload._syncedAt);
-  return true;
+  const keysToWrite = SYNC_DATA_KEYS.filter(k => payload[k] !== undefined);
+  // 여러 키에 나눠 쓰는 작업이라 중간에 실패하면 "일부만 원격 값으로 바뀐" 혼합 상태가 될 수 있다.
+  // 쓰기 전에 기존 값을 백업해두고, 실패 시 이미 반영된 키들을 원래 값으로 되돌린다.
+  const previous = {};
+  keysToWrite.forEach(k => { previous[k] = localStorage.getItem(k); });
+  const prevLast = localStorage.getItem(SYNC_LAST_KEY);
+  const written = [];
+  try {
+    keysToWrite.forEach(k => {
+      localStorage.setItem(k, payload[k]);
+      written.push(k);
+    });
+    if (payload._syncedAt) localStorage.setItem(SYNC_LAST_KEY, payload._syncedAt);
+    return true;
+  } catch (e) {
+    written.forEach(k => {
+      try { previous[k] === null ? localStorage.removeItem(k) : localStorage.setItem(k, previous[k]); }
+      catch (e2) { console.error('syncApplyPayload rollback failed for', k, e2); }
+    });
+    try { prevLast === null ? localStorage.removeItem(SYNC_LAST_KEY) : localStorage.setItem(SYNC_LAST_KEY, prevLast); }
+    catch (e2) { /* 최후 롤백까지 실패하면 더 손쓸 수 없음 */ }
+    showSaveErrorToast('동기화 데이터를 반영하는 중 저장 공간 문제가 발생해 이전 상태로 되돌렸어요.');
+    return false;
+  }
 }
 async function syncDoDownload(silent) {
   const payload = await syncFetchRemotePayload(silent);
   if (!payload) return false;
-  syncApplyPayload(payload);
+  const applied = syncApplyPayload(payload);
+  if (!applied) { syncSetBtnState('error'); return false; }
   syncSetBtnState('idle');
   return true;
 }
@@ -1549,9 +1571,9 @@ async function syncAutoDownloadOnLoad() {
     syncSetBtnState('pending');
     return;
   }
-  syncApplyPayload(payload);
-  syncSetBtnState('idle');
-  renderAllAfterSync();
+  const applied = syncApplyPayload(payload);
+  syncSetBtnState(applied ? 'idle' : 'error');
+  if (applied) renderAllAfterSync();
 }
 // 화면을 다시 그려서 받아온 데이터를 반영 (각 탭 렌더 함수 재호출)
 function renderAllAfterSync() {
@@ -2121,26 +2143,47 @@ function pruneOldWeekTasks() {
   cutoff.setDate(cutoff.getDate() - 52*7);
   const cutoffKey = weekKeyOf(cutoff);
   const toArchive = {};
+  const newActive = Object.assign({}, weekTasksAll); // 복사본 — weekTasksAll 자체는 아직 안 건드림
   let changed = false;
   Object.keys(weekTasksAll).forEach(function(key){
-    if (key < cutoffKey) { toArchive[key] = weekTasksAll[key]; changed = true; }
+    if (key < cutoffKey) { toArchive[key] = weekTasksAll[key]; delete newActive[key]; changed = true; }
   });
   if (!changed) return;
-  // 계산은 복사본(toArchive)으로 먼저 하고, weekTasksAll(메모리/활성 저장소)은 아직 건드리지 않는다.
-  const archived = load(LS_WEEK_ARCHIVE, {});
-  Object.keys(toArchive).forEach(function(key){ archived[key] = toArchive[key]; });
-  // 아카이브 저장이 먼저 성공해야만 활성 목록에서 제거한다.
-  // (순서를 반대로 하면 아카이브 저장이 실패했을 때 데이터가 활성 목록/아카이브 어디에도 남지 않게 됨)
-  const archiveSaved = save(LS_WEEK_ARCHIVE, archived);
+
+  // 롤백용 원본은 raw 문자열로 보관한다 — 키가 원래 아예 없었다면(null) 그 사실 자체를 기억해둬야
+  // 나중에 롤백할 때 "{}"로 새로 만들지 않고 완전히 제거할 수 있다.
+  const prevArchivedRaw = localStorage.getItem(LS_WEEK_ARCHIVE);
+  let prevArchived = {};
+  if (prevArchivedRaw) { try { prevArchived = JSON.parse(prevArchivedRaw); } catch(e) { prevArchived = {}; } }
+  const nextArchived = Object.assign({}, prevArchived);
+  Object.keys(toArchive).forEach(function(key){ nextArchived[key] = toArchive[key]; });
+
+  // 1) 아카이브 저장이 먼저 성공해야만 다음 단계로 진행한다.
+  const archiveSaved = save(LS_WEEK_ARCHIVE, nextArchived);
   if (!archiveSaved) {
     showSaveErrorToast('오래된 주간 데이터를 정리하지 못했어요. 저장 공간을 확인해주세요. (기존 데이터는 그대로 보존됩니다)');
-    return; // weekTasksAll은 그대로 유지 -> 데이터 보존
+    return; // weekTasksAll도, localStorage도 아직 전혀 안 바뀌었음 -> 데이터 보존
   }
-  Object.keys(toArchive).forEach(function(key){ delete weekTasksAll[key]; });
-  const activeSaved = save(LS.weekTasks, weekTasksAll);
+
+  // 2) 활성 목록은 "복사본(newActive)"으로 저장을 시도한다 — weekTasksAll(메모리)은 아직 그대로.
+  const activeSaved = save(LS.weekTasks, newActive);
   if (!activeSaved) {
-    showSaveErrorToast('정리한 내용은 백업에 안전하게 저장됐지만, 활성 목록 저장에는 실패했어요. 새로고침 후 다시 확인해주세요.');
+    // 활성 저장 실패: 방금 성공시킨 아카이브 쓰기를 정리 이전과 정확히 동일한 raw 상태로 되돌린다.
+    // 키가 원래 없었다면 "{}"를 새로 쓰는 게 아니라 완전히 제거해야 진짜 "정리 이전과 동일한 상태"가 된다.
+    let rolledBack;
+    try {
+      if (prevArchivedRaw === null) localStorage.removeItem(LS_WEEK_ARCHIVE);
+      else localStorage.setItem(LS_WEEK_ARCHIVE, prevArchivedRaw);
+      rolledBack = true;
+    } catch(e) { rolledBack = false; }
+    showSaveErrorToast(rolledBack
+      ? '저장 공간이 부족해 오래된 주간 데이터 정리를 취소했어요. 기존 데이터는 그대로예요.'
+      : '정리를 되돌리는 데도 실패했어요. 데이터가 꼬였을 수 있으니 새로고침 후 백업(설정 > 백업 다운로드)을 확인해주세요.');
+    return; // weekTasksAll은 한 번도 mutate하지 않았으므로 여전히 원본 상태
   }
+
+  // 3) 두 저장이 모두 성공한 뒤에만 실제 메모리(weekTasksAll)를 갱신한다 — 이 시점부턴 실패할 수 없음.
+  Object.keys(toArchive).forEach(function(key){ delete weekTasksAll[key]; });
   showInfoToast('1년 넘은 주간 할 일을 목록에서 정리했어요. 데이터는 지우지 않고 백업으로 보관 중이에요.', '백업 다운로드', downloadWeekArchiveBackup);
 }
 // 아카이브(정리되어 빠진 과거 주차 데이터)를 JSON 파일로 다운로드
@@ -3464,11 +3507,15 @@ function tabHTML(tab) {
     function invDonutData(scope) {
       const rows = scope === 'ALL' ? investments : investments.filter(iv=>iv.person===scope);
       const byStock = {};
-      rows.forEach(function(iv){ byStock[iv.stock] = (byStock[iv.stock]||0) + iv.shares*iv.avgPrice; });
+      const byStockShares = {};
+      rows.forEach(function(iv){
+        byStock[iv.stock] = (byStock[iv.stock]||0) + iv.shares*iv.avgPrice;
+        byStockShares[iv.stock] = (byStockShares[iv.stock]||0) + iv.shares;
+      });
       const total = Object.values(byStock).reduce(function(s,v){ return s+v; },0);
       return Object.keys(byStock).map(function(stock){
         const value = byStock[stock];
-        return { stock: stock, value: value, pct: total>0 ? value/total*100 : 0, color: invStockColor(stock) };
+        return { stock: stock, value: value, shares: byStockShares[stock], pct: total>0 ? value/total*100 : 0, color: invStockColor(stock) };
       }).sort(function(a,b){ return b.value-a.value; });
     }
     function invDonutSvg(data, centerLabel, centerValue) {
@@ -3481,7 +3528,7 @@ function tabHTML(tab) {
           +' stroke-dasharray="'+dash.toFixed(2)+' '+(circum-dash).toFixed(2)+'"'
           +' stroke-dashoffset="'+(-offset).toFixed(2)+'"'
           +' transform="rotate(-90 '+CX+' '+CY+')">'
-          +'<title>'+d.stock+' '+Math.round(d.value).toLocaleString()+'원 ('+d.pct.toFixed(1)+'%)</title>'
+          +'<title>'+d.stock+' '+d.shares.toLocaleString()+'주 · '+Math.round(d.value).toLocaleString()+'원 ('+d.pct.toFixed(1)+'%)</title>'
           +'</circle>';
         offset += dash;
         return seg;
@@ -3500,11 +3547,11 @@ function tabHTML(tab) {
       const total = data.reduce(function(s,d){ return s+d.value; },0);
       const centerLabel = scope==='ALL' ? '전체' : scope;
       const legend = data.map(function(d){
-        return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+        return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">'
           +'<div style="width:10px;height:10px;border-radius:3px;background:'+d.color+';flex-shrink:0"></div>'
           +'<span style="font-size:'+fitFontSize(d.stock,12,9)+'px;color:var(--text);flex:1;min-width:0;line-height:1.3;word-break:break-all">'+d.stock+'</span>'
           +'<span style="font-size:12px;color:var(--text);font-weight:500">'+d.pct.toFixed(1)+'%</span>'
-          +'<span style="font-size:10px;color:var(--text3);min-width:70px;text-align:right">'+Math.round(d.value).toLocaleString()+'원</span>'
+          +'<span style="font-size:10px;color:var(--text3);min-width:88px;text-align:right;line-height:1.4">'+d.shares.toLocaleString()+'주<br>'+Math.round(d.value).toLocaleString()+'원</span>'
           +'</div>';
       }).join('');
       return '<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px">'
