@@ -1376,12 +1376,14 @@ async function lcSyncDoUpload(silent){
   }
 }
 
-async function lcSyncDoDownload(silent){
+// 원격 데이터를 "가져오기만" 하고 localStorage에는 아무것도 쓰지 않음.
+// (자동 다운로드에서 경합 여부를 먼저 확인한 뒤에만 lcSyncApplyPayload로 반영하기 위해 분리)
+async function lcSyncFetchRemotePayload(silent){
   const cfg = lcSyncGetCfg();
   const {token, owner, repo} = cfg;
   if (!token || !owner || !repo){
     if (!silent) lcSyncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad');
-    return false;
+    return null;
   }
   _lcSyncInFlight = true;
   lcSyncSetBtnState('syncing');
@@ -1391,23 +1393,34 @@ async function lcSyncDoDownload(silent){
     const getRes = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' } });
     if (getRes.status === 404){
       if (!silent) throw new Error('GitHub에 동기화 파일이 아직 없어요. 먼저 다른 기기에서 업로드해주세요.');
-      return false;
+      return null;
     }
     if (!getRes.ok){ const errData = await getRes.json().catch(()=>({})); throw new Error(`다운로드 실패 (${getRes.status}): ${errData.message||''}`); }
     const getData = await getRes.json();
     const decoded = lcB64Decode(getData.content.replace(/\n/g, ''));
     const payload = JSON.parse(decoded);
-    LC_SYNC_DATA_KEYS.forEach(k => { if (payload[k] !== undefined) localStorage.setItem(k, payload[k]); });
-    if (payload._syncedAt) localStorage.setItem(LC_SYNC_LAST_KEY, payload._syncedAt);
-    lcSyncSetBtnState('idle');
-    return true;
+    return payload;
   }catch(e){
     if (!silent) lcSyncSetStatus('✗ ' + e.message, 'bad');
     lcSyncSetBtnState('error');
-    return false;
+    return null;
   } finally {
     _lcSyncInFlight = false;
   }
+}
+// 가져온 원격 payload를 실제 localStorage에 반영 (이 시점부터 "덮어쓰기"가 발생)
+function lcSyncApplyPayload(payload){
+  if (!payload) return false;
+  LC_SYNC_DATA_KEYS.forEach(k => { if (payload[k] !== undefined) localStorage.setItem(k, payload[k]); });
+  if (payload._syncedAt) localStorage.setItem(LC_SYNC_LAST_KEY, payload._syncedAt);
+  return true;
+}
+async function lcSyncDoDownload(silent){
+  const payload = await lcSyncFetchRemotePayload(silent);
+  if (!payload) return false;
+  lcSyncApplyPayload(payload);
+  lcSyncSetBtnState('idle');
+  return true;
 }
 
 async function lcSyncUpload(){
@@ -1427,16 +1440,25 @@ async function lcSyncDownload(){
 async function lcSyncAutoDownloadOnLoad(){
   if (!lcSyncIsConfigured()){ lcSyncSetBtnState('idle'); return; }
   lcSyncSetBtnState('syncing');
-  const ok = await lcSyncDoDownload(true);
-  lcSyncSetBtnState('idle');
-  if (ok){
-    try{
-      loadInputs();
-      if (typeof syncFromFocusFlow === 'function') syncFromFocusFlow();
-      runSim();
-      if (typeof render === 'function') render();
-    }catch(e){}
+  const hadLocalChangeBefore = _lcSyncPendingLocalChange;
+  const payload = await lcSyncFetchRemotePayload(true);
+  if (!payload){ lcSyncSetBtnState('idle'); return; }
+  // 응답을 기다리는 동안 사용자가 화면을 수정했다면(=_lcSyncPendingLocalChange가 새로 true가 됨),
+  // 방금 받아온(어쩌면 더 오래된) 원격 데이터로 localStorage/화면을 덮어쓰면 안 됨.
+  // 이 체크는 반드시 lcSyncApplyPayload(=localStorage 반영) 전에 이뤄져야 한다.
+  if (!hadLocalChangeBefore && _lcSyncPendingLocalChange){
+    lcSyncSetStatus('방금 수정하는 동안 다른 기기 데이터를 받아왔어요. 덮어쓰지 않고 지금 화면 내용을 유지했어요.', 'bad');
+    lcSyncSetBtnState('pending');
+    return;
   }
+  lcSyncApplyPayload(payload);
+  lcSyncSetBtnState('idle');
+  try{
+    loadInputs();
+    if (typeof syncFromFocusFlow === 'function') syncFromFocusFlow();
+    runSim();
+    if (typeof render === 'function') render();
+  }catch(e){}
 }
 
 function lcSyncScheduleAutoUpload(){
