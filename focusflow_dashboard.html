@@ -1292,12 +1292,14 @@ function save(key, val) {
   try {
     localStorage.setItem(key, JSON.stringify(val));
     syncScheduleAutoUpload();
+    return true;
   } catch(e) {
     console.error('save() failed for key', key, e);
     const isQuota = e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
     showSaveErrorToast(isQuota
       ? '저장 공간이 부족해요. 오래된 데이터 정리가 필요할 수 있어요.'
       : '데이터 저장에 실패했어요. 방금 변경한 내용이 반영되지 않았을 수 있어요.');
+    return false;
   }
 }
 function load(key, def) { try { const v=localStorage.getItem(key); return v?JSON.parse(v):def; } catch(e){ return def; } }
@@ -1464,12 +1466,14 @@ async function syncDoUpload(silent) {
   }
 }
 
-async function syncDoDownload(silent) {
+// 원격 데이터를 "가져오기만" 하고 localStorage에는 아무것도 쓰지 않음.
+// (자동 다운로드에서 경합 여부를 먼저 확인한 뒤에만 syncApplyPayload로 반영하기 위해 분리)
+async function syncFetchRemotePayload(silent) {
   const cfg = syncGetCfg();
   const {token, owner, repo} = cfg;
   if (!token || !owner || !repo) {
     if (!silent) syncSetStatus('토큰, 소유자, 레포 이름을 모두 입력해주세요.', 'bad');
-    return false;
+    return null;
   }
   _syncInFlight = true;
   syncSetBtnState('syncing');
@@ -1479,7 +1483,7 @@ async function syncDoDownload(silent) {
     const getRes = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' } });
     if (getRes.status === 404) {
       if (!silent) throw new Error('GitHub에 동기화 파일이 아직 없어요. 먼저 다른 기기에서 업로드해주세요.');
-      return false; // silent 자동 다운로드에서는 첫 사용 시 파일 없는 게 정상이라 조용히 무시
+      return null; // silent 자동 다운로드에서는 첫 사용 시 파일 없는 게 정상이라 조용히 무시
     }
     if (!getRes.ok) {
       const errData = await getRes.json().catch(()=>({}));
@@ -1488,17 +1492,28 @@ async function syncDoDownload(silent) {
     const getData = await getRes.json();
     const decoded = syncB64Decode(getData.content.replace(/\n/g, ''));
     const payload = JSON.parse(decoded);
-    SYNC_DATA_KEYS.forEach(k => { if (payload[k] !== undefined) localStorage.setItem(k, payload[k]); });
-    if (payload._syncedAt) localStorage.setItem(SYNC_LAST_KEY, payload._syncedAt);
-    syncSetBtnState('idle');
-    return true;
+    return payload;
   } catch (e) {
     if (!silent) syncSetStatus('✗ ' + e.message, 'bad');
     syncSetBtnState('error');
-    return false;
+    return null;
   } finally {
     _syncInFlight = false;
   }
+}
+// 가져온 원격 payload를 실제 localStorage에 반영 (이 시점부터 "덮어쓰기"가 발생)
+function syncApplyPayload(payload) {
+  if (!payload) return false;
+  SYNC_DATA_KEYS.forEach(k => { if (payload[k] !== undefined) localStorage.setItem(k, payload[k]); });
+  if (payload._syncedAt) localStorage.setItem(SYNC_LAST_KEY, payload._syncedAt);
+  return true;
+}
+async function syncDoDownload(silent) {
+  const payload = await syncFetchRemotePayload(silent);
+  if (!payload) return false;
+  syncApplyPayload(payload);
+  syncSetBtnState('idle');
+  return true;
 }
 
 // 수동 버튼용 래퍼 (모달 안의 버튼은 그대로 유지, 필요하면 강제로 즉시 실행)
@@ -1522,18 +1537,21 @@ async function syncAutoDownloadOnLoad() {
   if (!syncIsConfigured()) { syncSetBtnState('idle'); return; }
   syncSetBtnState('syncing');
   const hadLocalChangeBefore = _syncPendingLocalChange;
-  const ok = await syncDoDownload(true);
+  const payload = await syncFetchRemotePayload(true);
+  if (!payload) { syncSetBtnState('idle'); return; }
   // 응답을 기다리는 동안 사용자가 화면을 수정했다면(=save()가 호출돼 _syncPendingLocalChange가 새로 true가 됨),
-  // 방금 받아온(어쩌면 더 오래된) 원격 데이터로 화면/localStorage를 덮어쓰면 안 됨.
-  if (ok && !hadLocalChangeBefore && _syncPendingLocalChange) {
+  // 방금 받아온(어쩌면 더 오래된) 원격 데이터로 localStorage/화면을 덮어쓰면 안 됨.
+  // 이 체크는 반드시 syncApplyPayload(=localStorage 반영) 전에 이뤄져야 한다.
+  if (!hadLocalChangeBefore && _syncPendingLocalChange) {
     showInfoToast('방금 수정하는 동안 다른 기기 데이터를 받아왔어요. 덮어쓰지 않고 지금 화면 내용을 유지했어요.', '지금 다시 받아오기', function(){
       location.reload();
     });
     syncSetBtnState('pending');
     return;
   }
+  syncApplyPayload(payload);
   syncSetBtnState('idle');
-  if (ok) renderAllAfterSync();
+  renderAllAfterSync();
 }
 // 화면을 다시 그려서 받아온 데이터를 반영 (각 탭 렌더 함수 재호출)
 function renderAllAfterSync() {
@@ -2102,20 +2120,28 @@ function pruneOldWeekTasks() {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 52*7);
   const cutoffKey = weekKeyOf(cutoff);
+  const toArchive = {};
   let changed = false;
-  let archived = load(LS_WEEK_ARCHIVE, {});
   Object.keys(weekTasksAll).forEach(function(key){
-    if (key < cutoffKey) {
-      archived[key] = weekTasksAll[key];
-      delete weekTasksAll[key];
-      changed = true;
-    }
+    if (key < cutoffKey) { toArchive[key] = weekTasksAll[key]; changed = true; }
   });
-  if (changed) {
-    save(LS.weekTasks, weekTasksAll);
-    save(LS_WEEK_ARCHIVE, archived);
-    showInfoToast('1년 넘은 주간 할 일을 목록에서 정리했어요. 데이터는 지우지 않고 백업으로 보관 중이에요.', '백업 다운로드', downloadWeekArchiveBackup);
+  if (!changed) return;
+  // 계산은 복사본(toArchive)으로 먼저 하고, weekTasksAll(메모리/활성 저장소)은 아직 건드리지 않는다.
+  const archived = load(LS_WEEK_ARCHIVE, {});
+  Object.keys(toArchive).forEach(function(key){ archived[key] = toArchive[key]; });
+  // 아카이브 저장이 먼저 성공해야만 활성 목록에서 제거한다.
+  // (순서를 반대로 하면 아카이브 저장이 실패했을 때 데이터가 활성 목록/아카이브 어디에도 남지 않게 됨)
+  const archiveSaved = save(LS_WEEK_ARCHIVE, archived);
+  if (!archiveSaved) {
+    showSaveErrorToast('오래된 주간 데이터를 정리하지 못했어요. 저장 공간을 확인해주세요. (기존 데이터는 그대로 보존됩니다)');
+    return; // weekTasksAll은 그대로 유지 -> 데이터 보존
   }
+  Object.keys(toArchive).forEach(function(key){ delete weekTasksAll[key]; });
+  const activeSaved = save(LS.weekTasks, weekTasksAll);
+  if (!activeSaved) {
+    showSaveErrorToast('정리한 내용은 백업에 안전하게 저장됐지만, 활성 목록 저장에는 실패했어요. 새로고침 후 다시 확인해주세요.');
+  }
+  showInfoToast('1년 넘은 주간 할 일을 목록에서 정리했어요. 데이터는 지우지 않고 백업으로 보관 중이에요.', '백업 다운로드', downloadWeekArchiveBackup);
 }
 // 아카이브(정리되어 빠진 과거 주차 데이터)를 JSON 파일로 다운로드
 function downloadWeekArchiveBackup() {
