@@ -412,7 +412,10 @@ canvas{width:100%;display:block}
     <div class="stg-body">
       <div class="inp-row">
         <div class="inp-box"><div class="inp-lbl">현재 잔액<span class="hint">재테크 탭 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cur" type="number" value="0" readonly style="color:var(--mut2)"/><span class="inp-unit">만원</span></div></div>
-        <div class="inp-box"><div class="inp-lbl">연 납입액<span class="hint">한도 2,000만원</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_contrib" type="number" value="2000"/><span class="inp-unit">만원</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">퇴직 전 연 납입액<span class="hint">한도 2,000만원</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_contrib" type="number" value="2000"/><span class="inp-unit">만원</span></div></div>
+      </div>
+      <div class="inp-row">
+        <div class="inp-box" style="grid-column:1/-1"><div class="inp-lbl">퇴직 후 연 납입액<span class="hint">퇴직 후에도 계속 넣을 금액 (소득 없으면 0)</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_contrib_post" type="number" value="2000"/><span class="inp-unit">만원</span></div></div>
       </div>
       <div style="font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut);letter-spacing:.1em;padding:2px 0">포트폴리오 구성</div>
       <div class="ratio-card">
@@ -433,7 +436,10 @@ canvas{width:100%;display:block}
         <span class="auto-k">혼합 수익률 (자동계산)</span>
         <span class="auto-v" id="i_blend_display" style="color:var(--grn)">—</span>
       </div>
-      <div class="inp-box"><div class="inp-lbl">만기 사이클<span class="hint">3년 또는 5년</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cycle" type="number" value="5" min="3" max="5"/><span class="inp-unit">년</span></div></div>
+      <div class="inp-row">
+        <div class="inp-box"><div class="inp-lbl">다음 만기일<span class="hint">비워두면 오늘+사이클로 가정</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_mat_date" type="month"/></div></div>
+        <div class="inp-box"><div class="inp-lbl">재가입 사이클<span class="hint">1회성 아닐 때만 사용</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cycle" type="number" value="5" min="3" max="5"/><span class="inp-unit">년</span></div></div>
+      </div>
       <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-family:'Noto Serif KR',serif;font-size:11px;color:var(--mut2);cursor:pointer">
         <input type="checkbox" id="isa_once" class="sim-inp sim-chk" style="accent-color:var(--grn)"/>
         만기 후 반복 안 함 (1회만 연금저축으로 이전)
@@ -478,6 +484,11 @@ canvas{width:100%;display:block}
         <div class="inp-box"><div class="inp-lbl">연금수령 시작 나이<span class="hint">만 55세 이상</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_age" type="number" value="60"/><span class="inp-unit">세</span></div></div>
         <div class="inp-box"><div class="inp-lbl">연금소득세율<span class="hint">3.3~5.5%</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_tax" type="number" value="5.5" step=".1"/><span class="inp-unit">%</span></div></div>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-family:'Noto Serif KR',serif;font-size:11px;color:var(--mut2);cursor:pointer">
+        <input type="checkbox" id="allow_gain_wd" class="sim-inp sim-chk" style="accent-color:var(--blu)"/>
+        과세제외 원금 소진 후 수익분(과세) 자동 인출 허용
+      </label>
+      <div style="font-family:'Noto Serif KR',serif;font-size:10px;color:var(--mut);margin-top:4px;line-height:1.6">기본값(체크 해제)은 원금 소진 후 자동 인출을 막고, 대신 그 해 부족분을 "브리지 실패"로 표시해요.</div>
     </div>
   </div>
 
@@ -775,7 +786,7 @@ function runSim(){
   const preSave = gv('pre_save');
   const severance = gv('severance');
   const gP=gv('g_p'), gYield=gv('g_yield')/100, gNav=gv('g_nav')/100, gFinInc=gv('g_fin_inc');
-  const iCur=gv('i_cur'), iContrib=gv('i_contrib');
+  const iCur=gv('i_cur'), iContrib=gv('i_contrib'), iContribPost=gv('i_contrib_post');
   const iCcPct=gv('i_cc_pct')/100, iCcYield=gv('i_cc_yield')/100;
   const iActRet=gv('i_act_ret')/100;
   const iActPct=1-iCcPct;
@@ -784,6 +795,12 @@ function runSim(){
   const isaCycle=gv('i_cycle')||5;
   const isaOnce=gvChecked('isa_once');
   const isaCycleSubEl=document.getElementById('isaCycleSub');if(isaCycleSubEl)isaCycleSubEl.textContent=isaCycle;
+  // ISA 만기일: 실제 날짜 입력(비워두면 오늘+사이클로 대체). 매 사이클마다 이 날짜가 속한 해에 이전이 일어남.
+  const iMatDateStr = gvStr('i_mat_date');
+  let iMatDate = iMatDateStr ? new Date(iMatDateStr+'-01T00:00:00') : null;
+  if (!iMatDate || iMatDate <= now) {
+    iMatDate = new Date(now.getFullYear()+isaCycle, now.getMonth(), 1);
+  }
 
   const pExcl=gv('p_excl'), pGain=gv('p_gain');
   const pCcPct=gv('p_cc_pct')/100, pCcYield=gv('p_cc_yield')/100;
@@ -792,6 +809,28 @@ function runSim(){
   const pBlend=pCcPct*pCcYield + pActPct*pActRet;
   const pRet=pBlend;
   const pAge=gv('p_age'), pTax=gv('p_tax')/100;
+  const allowGainWd=gvChecked('allow_gain_wd'); // 기본 false: 원금 소진 후 수익분 자동인출 금지
+
+  // 퇴직 시점 총자산 (근사치): 오늘→퇴직일까지 근로기간 성장·납입만 반영해 투영.
+  // 연도별 표의 정밀 계산과는 별개의 단순 투영이라 약간의 오차가 있을 수 있음(라벨에 "추정" 표기).
+  let retireSnapshot = null;
+  if (isFutureRetire) {
+    let sG=gP, sI=iCur, sPE=pExcl, sPG=pGain;
+    let cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    while (cursor < retireDate) {
+      const yEnd = new Date(cursor.getFullYear(),11,31,23,59,59);
+      const segEnd = retireDate < yEnd ? retireDate : yEnd;
+      const daysInYear = Math.round((new Date(cursor.getFullYear(),11,31,23,59,59)-new Date(cursor.getFullYear(),0,1))/86400000)+1;
+      const segDays = Math.max(0, Math.round((segEnd-cursor)/86400000));
+      const frac = Math.min(1, segDays/daysInYear);
+      sG = sG*(1+(gYield+gNav)*frac) + preSave*12*frac;
+      sI = sI*(1+iRet*frac) + iContrib*frac;
+      sPG = sPG + (sPE+sPG)*pRet*frac;
+      cursor = new Date(cursor.getFullYear()+1,0,1);
+    }
+    sG += severance;
+    retireSnapshot = {total: sG+sI+sPE+sPG, g:sG, i:sI, pe:sPE, pg:sPG};
+  }
   const extraM=gv('extra_m'), extraYrs=gv('extra_yrs');
   const exp=gv('exp'), infRate=gv('inf_rate')/100, nps=gv('nps'), npsAge=gv('nps_age');
   const house=gv('house'), car=gv('car'), carYr=gv('car_yr');
@@ -806,14 +845,23 @@ function runSim(){
   const pBlendEl=document.getElementById('p_blend_display');
   if(pBlendEl)pBlendEl.textContent=(pBlend*100).toFixed(1)+'% (커버드콜 '+Math.round(pCcPct*100)+'% + 액티브 '+Math.round(pActPct*100)+'%)';
 
-  // ISA 만기 예상 전환액 (올해분은 남은 기간만큼만 성장 반영, 그다음 해부터 온전한 1년씩)
+  // ISA 만기 예상 전환액 — 실제 만기일까지 달력 기준으로 부분연도/온전연도를 나눠 투영
   let isaTransferPreview = iCur;
-  for (let yy=1; yy<=isaCycle; yy++){
-    const frac = (yy===1) ? firstYearFraction : 1;
-    isaTransferPreview = isaTransferPreview*(1+iRet*frac) + iContrib;
+  {
+    let cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    while (cursor < iMatDate) {
+      const yEnd = new Date(cursor.getFullYear(), 11, 31, 23, 59, 59);
+      const segEnd = iMatDate < yEnd ? iMatDate : yEnd;
+      const daysInYear = Math.round((new Date(cursor.getFullYear(),11,31,23,59,59) - new Date(cursor.getFullYear(),0,1))/86400000)+1;
+      const segDays = Math.max(0, Math.round((segEnd - cursor)/86400000));
+      const frac = Math.min(1, segDays/daysInYear);
+      isaTransferPreview = isaTransferPreview*(1+iRet*frac) + iContrib*frac;
+      cursor = new Date(cursor.getFullYear()+1, 0, 1);
+    }
   }
+  const matYears = Math.max(0, Math.round((iMatDate-now)/86400000/365.25*10)/10);
   const iTransEl=document.getElementById('i_transfer_display');
-  if(iTransEl)iTransEl.textContent=fmtW(Math.round(isaTransferPreview))+'원 ('+isaCycle+'년 후)';
+  if(iTransEl)iTransEl.textContent=fmtW(Math.round(isaTransferPreview))+'원 ('+iMatDate.getFullYear()+'.'+(iMatDate.getMonth()+1)+', 약 '+matYears+'년 후)';
 
   // 월 분배금
   const gDist=Math.round(gP*gYield/12);
@@ -840,7 +888,7 @@ function runSim(){
   warnEl.innerHTML=(gFinInc>1000
     ?`<div class="warn-box">⚠️ 금융소득 연 ${fmtN(gFinInc)}만원 → 1,000만원 초과<br>건보료 소득분 반영됩니다.</div>`
     :`<div class="ok-box">✓ 금융소득 연 ${fmtN(gFinInc)}만원 → 1,000만원 이하 유지<br>건보료에 금융소득 미반영</div>`)
-    +(isFutureRetire?`<div class="ok-box" style="margin-top:8px">ℹ️ 아래 요약 카드는 "오늘 은퇴했다면"을 가정한 참고용 스냅샷이에요. 실제 퇴직일(${retireDate.getFullYear()}.${retireDate.getMonth()+1})을 반영한 계산은 연도별 표를 확인하세요.</div>`:'');
+    +(isFutureRetire&&retireSnapshot?`<div class="ok-box" style="margin-top:8px">ℹ️ 아래 상단 카드는 "오늘 은퇴했다면"을 가정한 참고용이에요. <b>퇴직 예정일(${retireDate.getFullYear()}.${retireDate.getMonth()+1}) 시점 총자산은 약 ${fmtW(Math.round(retireSnapshot.total))}원(추정)</b>이고, 정밀한 시나리오는 연도별 표를 확인하세요.</div>`:'');
 
   // 요약 카드
   document.getElementById('summaryCards').innerHTML=`
@@ -848,6 +896,7 @@ function runSim(){
     <div class="res-card"><div class="res-val" style="color:${surplus>=0?'var(--grn)':'var(--red)'}">${surplus>=0?'+':''}${fmtM(Math.round(surplus))}원</div><div class="res-lbl">현금흐름 순 잉여금<br><span style="font-size:9px;color:var(--mut2)">적자 시 연금원금 인출</span></div></div>
     <div class="res-card"><div class="res-val" style="color:var(--acc);font-size:18px">${fmtN(gDist)}만원</div><div class="res-lbl">일반계좌 월 분배금</div></div>
     <div class="res-card"><div class="res-val" style="color:var(--mut2);font-size:18px">${fmtM(Math.round(insM*10)/10)}원</div><div class="res-lbl">건보료 (월)</div></div>
+    ${isFutureRetire&&retireSnapshot?`<div class="res-card full"><div class="res-val" style="color:var(--rem)">${fmtM(Math.round(retireSnapshot.total))}원</div><div class="res-lbl">퇴직 예정일(${retireDate.getFullYear()}.${retireDate.getMonth()+1}) 시점 총자산 (추정)<br><span style="font-size:9px;color:var(--mut2)">일반 ${fmtM(Math.round(retireSnapshot.g))} + ISA ${fmtM(Math.round(retireSnapshot.i))} + 연금 ${fmtM(Math.round(retireSnapshot.pe+retireSnapshot.pg))}</span></div></div>`:''}
   `;
 
   // 현금흐름
@@ -885,12 +934,104 @@ function runSim(){
   let aG=gP, aI=iCur, aPE=pExcl, aPG=pGain;
   let iCyclePrin = iCur; // ISA 사이클별 원금 추적용
   let isaMatured = false; // "1회성" 옵션 체크 시, 첫 만기 이후로는 더 이상 반복하지 않음
+  let nextIsaMatDate = iMatDate; // 실제 만기일 기준 트래커 (사이클 반복 시 이 날짜를 다음 만기로 계속 갱신)
   let severanceApplied = false; // 퇴직금은 딱 한 번만 합산
   let depletionRow = null; // 과세제외 원금(aPE)이 최초로 소진된 시점 기록
 
+  // 한 해(row) 안의 임의 구간 [segStart, segEnd]에 대해 현금흐름→수익→자산반영→ISA만기 순으로 계산.
+  // ISA 만기일이 연도 중간에 있으면 이 함수를 만기 시점 전/후로 두 번 호출해서,
+  // "만기 전까지의 수익·납입"만 이체금액에 섞이고 "만기 후"는 새 사이클로 분리되게 한다.
+  function runSegment(segStart, segEnd, daysInRowYear, y, age, rowYear){
+    const segDays = Math.max(0, Math.round((segEnd-segStart)/86400000));
+    const frac = segDays/daysInRowYear;
+    if (frac<=0) return {gEarnY:0,iEarnY:0,totalPEarn:0,totalEarnY:0,expY:0,surplusY:0,gDistY:0,severanceAddY:0,preSaveAddY:0,isaTransfer:0,pWdY:0,bridgeFailY:0};
+
+    // 퇴직 후 비율 (연 전체 대비 이 구간 몫만)
+    let retiredFrac;
+    if (!retireDate) retiredFrac = frac;
+    else if (retireDate >= segEnd) retiredFrac = 0;
+    else if (retireDate <= segStart) retiredFrac = frac;
+    else retiredFrac = Math.max(0, Math.round((segEnd-retireDate)/86400000)/daysInRowYear);
+    const workingFrac = Math.max(0, frac-retiredFrac);
+
+    const npsSeg=(age>=npsAge?nps*12:0)*frac;
+    const addSeg=(y<=extraYrs?extraM:0)*12*frac;
+    const insSeg=insM*12*retiredFrac;
+    const preSaveAddSeg=preSave*12*workingFrac;
+
+    let severanceAddSeg=0;
+    if(!severanceApplied && retireDate && retireDate>=segStart && retireDate<=segEnd){
+      severanceAddSeg=severance; severanceApplied=true;
+    }
+
+    const expSeg=exp*12*Math.pow(1+infRate,y-1)*retiredFrac;
+
+    const gDistSeg=aG*gYield*frac;
+    const cashIn=gDistSeg+npsSeg;
+    const cashOut=expSeg+insSeg;
+    const surplusSeg=cashIn-cashOut;
+    let reinvestSeg=0, pWdSeg=0;
+    if(surplusSeg>=0) reinvestSeg=surplusSeg; else pWdSeg=Math.abs(surplusSeg);
+
+    const gEarnSeg=aG*(gYield+gNav)*frac;
+    const iEarnSeg=isaMatured?0:aI*iRet*frac;
+    const totalPEarnSeg=(aPE+aPG-pWdSeg/2)*pRet*frac;
+    let totalEarnSeg=gEarnSeg+iEarnSeg+totalPEarnSeg;
+
+    aG=aG*(1+gNav*frac)+reinvestSeg+addSeg+preSaveAddSeg+severanceAddSeg;
+
+    const iContribSeg = iContrib*workingFrac + iContribPost*retiredFrac;
+    if (isaMatured){ aI=0; iCyclePrin=0; }
+    else { aI=aI*(1+iRet*frac)+iContribSeg; iCyclePrin+=iContribSeg; }
+
+    aPG+=totalPEarnSeg;
+    const aPEBeforeWd=aPE;
+    aPE-=pWdSeg;
+    let bridgeFailSeg=0;
+    if(aPE<0){
+      const shortfall=-aPE;
+      if(!depletionRow){
+        let approxMonth=null;
+        if(pWdSeg>0){
+          const fracToDeplete=Math.min(1,Math.max(0,aPEBeforeWd/pWdSeg));
+          const dayOffset=Math.round(fracToDeplete*segDays);
+          const approxDate=new Date(segStart.getTime()+dayOffset*86400000);
+          approxMonth=approxDate.getMonth()+1;
+        }
+        depletionRow={y,age,year:rowYear,approxMonth};
+      }
+      if(allowGainWd){
+        const pretaxNeeded=shortfall/Math.max(0.01,1-pTax);
+        aPG-=pretaxNeeded;
+      } else {
+        bridgeFailSeg=shortfall;
+      }
+      aPE=0;
+    }
+
+    let isaTransferSeg=0;
+    if(!isaMatured && nextIsaMatDate && nextIsaMatDate>=segStart && nextIsaMatDate<=segEnd){
+      const iProfit=Math.max(0,aI-iCyclePrin);
+      const taxableProfit=Math.max(0,iProfit-200);
+      const iTax=taxableProfit*0.099;
+      isaTransferSeg=aI-iTax;
+      aPE+=isaTransferSeg;
+      totalEarnSeg-=iTax;
+      aI=0; iCyclePrin=0;
+      if(isaOnce){
+        isaMatured=true;
+      } else {
+        nextIsaMatDate=new Date(nextIsaMatDate.getFullYear()+isaCycle, nextIsaMatDate.getMonth(), 1);
+      }
+    }
+
+    return {gEarnY:gEarnSeg, iEarnY:iEarnSeg, totalPEarn:totalPEarnSeg, totalEarnY:totalEarnSeg,
+      expY:expSeg, surplusY:surplusSeg, gDistY:gDistSeg, severanceAddY:severanceAddSeg,
+      preSaveAddY:preSaveAddSeg, isaTransfer:isaTransferSeg, pWdY:pWdSeg, bridgeFailY:bridgeFailSeg};
+  }
+
   for(let y=1;y<=years;y++){
     const age=(y===1) ? curAge : curAge+(y-1);
-    const yFrac = (y===1) ? firstYearFraction : 1; // 1년차만 올해 남은 기간 비율 적용
 
     // 이 구간(y)의 달력 범위 — y=1이면 [오늘, 올해 12/31], y>1이면 [해당연도 1/1, 12/31]
     const rowYear = (y===1) ? now.getFullYear() : now.getFullYear()+(y-1);
@@ -898,97 +1039,28 @@ function runSim(){
     const rowYearEnd = new Date(rowYear, 11, 31, 23, 59, 59);
     const daysInRowYear = Math.round((rowYearEnd - new Date(rowYear,0,1))/86400000) + 1;
 
-    // 퇴직 전환: 이 구간 중 "퇴직 이후"에 해당하는 비율만큼만 생활비를 인출한다.
-    // 퇴직일 미설정(또는 이미 지난 경우)이면 항상 전체 구간이 퇴직 후로 취급 — 기존 동작과 동일.
-    let retiredFracY = yFrac;
-    if (retireDate) {
-      if (retireDate >= rowYearEnd) retiredFracY = 0; // 이 구간 전체가 퇴직 전
-      else if (retireDate > rowStart) {
-        const retiredDays = Math.round((rowYearEnd - retireDate)/86400000) + 1;
-        retiredFracY = Math.min(yFrac, Math.max(0, retiredDays/daysInRowYear));
-      }
-    }
-    const workingFracY = Math.max(0, yFrac - retiredFracY);
-
-    const npsY=(age>=npsAge?nps*12:0)*yFrac; // 국민연금은 근로 여부와 무관, 나이 조건만 적용
-    const addY=(y<=extraYrs?extraM:0)*12*yFrac;
-    const insY=insM*12*retiredFracY; // 근로기간엔 직장가입자로 가정 → 이 계산식(지역가입자 기준) 미적용
-    const preSaveAddY = preSave*12*workingFracY; // 퇴직 전 저축/투자액은 근로 구간만큼만 누적
-
-    // 퇴직월이 이 구간(y) 안에 들어오면, 그 해에 딱 한 번 퇴직금을 일반계좌에 합산
-    let severanceAddY = 0;
-    if (!severanceApplied && retireDate && retireDate >= rowStart && retireDate <= rowYearEnd) {
-      severanceAddY = severance;
-      severanceApplied = true;
-    }
-
-    // 물가상승률 반영된 당해 연도 생활비 (퇴직 후 구간에만 적용)
-    const expY=exp*12*Math.pow(1+infRate, y-1)*retiredFracY;
-
-    // ── STEP 1: 현금흐름 및 생활비 부족분 산출 ──
-    const gDistY=aG*gYield*yFrac; // 배당은 근로 여부와 무관하게 원금 전체에서 발생
-    const cashIn=gDistY+npsY;
-    const cashOut=expY+insY;
-    const surplusY=cashIn-cashOut;
-
-    let reinvestY=0;
-    let pWdY=0;
-    if(surplusY >= 0){
-      reinvestY = surplusY;
+    // ISA 만기일이 이 구간(row) "안쪽"에 있으면 만기 전/후 두 구간으로 쪼개서 계산 —
+    // 그래야 만기 시점까지의 수익·납입만 이체금액에 들어가고, 만기 후 재투자·인출은 분리된다.
+    let segResult;
+    if (!isaMatured && nextIsaMatDate && nextIsaMatDate > rowStart && nextIsaMatDate < rowYearEnd) {
+      const r1 = runSegment(rowStart, nextIsaMatDate, daysInRowYear, y, age, rowYear);
+      const r2 = runSegment(nextIsaMatDate, rowYearEnd, daysInRowYear, y, age, rowYear);
+      segResult = {
+        gEarnY: r1.gEarnY+r2.gEarnY, iEarnY: r1.iEarnY+r2.iEarnY, totalPEarn: r1.totalPEarn+r2.totalPEarn,
+        totalEarnY: r1.totalEarnY+r2.totalEarnY, expY: r1.expY+r2.expY, surplusY: r1.surplusY+r2.surplusY,
+        gDistY: r1.gDistY+r2.gDistY, severanceAddY: r1.severanceAddY+r2.severanceAddY,
+        preSaveAddY: r1.preSaveAddY+r2.preSaveAddY, isaTransfer: r1.isaTransfer+r2.isaTransfer,
+        pWdY: r1.pWdY+r2.pWdY, bridgeFailY: r1.bridgeFailY+r2.bridgeFailY
+      };
     } else {
-      pWdY = Math.abs(surplusY);
+      segResult = runSegment(rowStart, rowYearEnd, daysInRowYear, y, age, rowYear);
     }
 
-    // ── STEP 2: 각 계좌 당해 연도 순수 수익 계산 (자산 이동 전) ──
-    const gEarnY = aG * (gYield + gNav) * yFrac;         // 일반계좌: 배당 + NAV 상승
-    const iEarnY = isaMatured ? 0 : aI * iRet * yFrac;   // ISA: 내부 복리 수익 (1회성 만기 후엔 계좌 없음)
-    const totalPEarn = (aPE + aPG - pWdY / 2) * pRet * yFrac;  // 연금저축: 생활비 차감 정밀 반영
-    let totalEarnY = gEarnY + iEarnY + totalPEarn;      // 당해 총 수익 (지표·실제 일치)
-
-    // ── STEP 3: 자산 증감 적용 ──
-    // 일반계좌: 재투자 + 추가납입 + 퇴직 전 저축액 + (퇴직월이면) 퇴직금
-    aG = aG * (1 + gNav*yFrac) + reinvestY + addY + preSaveAddY + severanceAddY;
-
-    // ISA: 복리 누적 + 납입 (1회성 만기 옵션 체크 시, 만기 이후로는 계좌가 더 이상 존재하지 않음)
-    if (isaMatured) {
-      aI = 0; iCyclePrin = 0;
-    } else {
-      aI = aI * (1 + iRet*yFrac) + iContrib;
-      iCyclePrin += iContrib;
-    }
-
-    // 연금저축: 수익 누적 → 생활비 인출
-    aPG += totalPEarn;
-    aPE -= pWdY;
-    if(aPE < 0){
-      if(!depletionRow) depletionRow = {y, age, year: rowYear}; // 원금이 최초로 바닥나는 시점 기록
-      const shortfall = -aPE; // 실제로 손에 쥐어야 하는 부족분(세후 기준)
-      const pretaxNeeded = shortfall / Math.max(0.01, 1-pTax); // 수익분은 과세 대상이라, 세후 shortfall을 채우려면 더 많이 인출해야 함
-      aPG -= pretaxNeeded; // 원금 고갈 시 수익분(과세)에서 세금 반영해 충당
-      aPE = 0;
-    }
-
-    // ── STEP 4: ISA 연말 만기 정산 (수익 계산 완료 후 이체 → 중복 복리 원천 차단) ──
-    let isaTransfer = 0;
-    if(!isaMatured && y % isaCycle === 0){
-      const iProfit = Math.max(0, aI - iCyclePrin);
-      const taxableProfit = Math.max(0, iProfit - 200);
-      const iTax = taxableProfit * 0.099;
-
-      isaTransfer = aI - iTax;
-      aPE += isaTransfer;   // 내년부터 연금 수익률 적용 (올해는 중복 없음)
-
-      totalEarnY -= iTax;   // 납부 세금을 당해 총 수익에서 차감
-      aI = 0;
-      iCyclePrin = 0;
-      if (isaOnce) isaMatured = true; // "1회성" 옵션이면 여기서 사이클 종료 — 이후 재납입/재성장 없음
-    }
+    const { gEarnY, iEarnY, totalPEarn, totalEarnY, expY, surplusY, gDistY, severanceAddY, preSaveAddY, isaTransfer, pWdY, bridgeFailY } = segResult;
 
     const total=aG+aI+aPE+aPG;
     // 1년차(올해)만: "연 분배금" 표시값을 실제 수령분(1월~오늘, 일반계좌) + 남은 기간 예상분으로 합산
     // "총 수익(당해)" 표시값도 마찬가지로, 일반+ISA+연금저축 전체의 실제 수령 배당을 더해줌
-    // (NAV 상승분·액티브 운용수익은 실적 기록이 없어 예상치를 그대로 유지)
-    // 시뮬레이션 계산(surplusY, reinvestY, aG 등)은 원래의 예상치를 그대로 사용 — 표시값만 보정
     const actualDivG = (y===1) ? getActualDivYTD('일반계좌') : 0;
     const actualDivI = (y===1) ? getActualDivYTD('ISA') : 0;
     const actualDivP = (y===1) ? getActualDivYTD('연금저축') : 0;
@@ -1012,7 +1084,8 @@ function runSim(){
       pWdY: y===1 ? Math.round(pWdY) : 0,
       severanceAddY: Math.round(severanceAddY),
       preSaveAddY: Math.round(preSaveAddY),
-      isDepletion: !!(depletionRow && depletionRow.y===y)
+      isDepletion: !!(depletionRow && depletionRow.y===y),
+      bridgeFailY: Math.round(bridgeFailY)
     });
   }
 
@@ -1022,15 +1095,25 @@ function runSim(){
 
   // 과세제외 원금(연금저축) 소진 경고
   const depWarnEl=document.getElementById('depletionWarn');
+  const totalBridgeFail = rows.reduce((s,r)=>s+(r.bridgeFailY||0),0);
   if(depWarnEl){
     if(depletionRow){
       const beforeNps = depletionRow.age < npsAge;
+      const whenTxt = depletionRow.approxMonth
+        ? `${depletionRow.age}세(${depletionRow.year}년 ${depletionRow.approxMonth}월경, 추정)`
+        : `${depletionRow.age}세(${depletionRow.year}년)`;
       depWarnEl.innerHTML = `<div class="${beforeNps?'warn-box':'ok-box'}" style="margin-top:8px">`
-        +`${beforeNps?'⚠️':'ℹ️'} 연금저축 과세제외 원금이 <b>${depletionRow.age}세(${depletionRow.year}년)</b>에 소진돼요. `
-        +`이후는 과세 대상인 수익분에서 ${(pTax*100).toFixed(1)}% 세율로 충당됩니다.`
+        +`${beforeNps?'⚠️':'ℹ️'} 연금저축 과세제외 원금이 <b>${whenTxt}</b>에 소진돼요. `
+        +(allowGainWd
+          ? `이후는 과세 대상인 수익분에서 ${(pTax*100).toFixed(1)}% 세율로 충당됩니다.`
+          : `수익분 자동 인출이 꺼져 있어 이후 부족분은 채워지지 않고 "브리지 실패"로 남아요.`)
         +(beforeNps
           ? `<br>국민연금 개시(${npsAge}세)보다 먼저 소진돼요 — 계획 재검토가 필요할 수 있어요.`
           : `<br>국민연금 개시(${npsAge}세) 이후라 상대적으로 여유가 있는 편이에요.`)
+        +(!allowGainWd && totalBridgeFail>0
+          ? `<br>85세까지 누적 브리지 실패액(추정): <b>${fmtM(Math.round(totalBridgeFail))}원</b>`
+          : '')
+        +`<br><span style="font-size:9px;color:var(--mut2)">※ 소진 월은 연간 인출이 고르게 일어난다는 가정 하의 근사치예요(월 단위 정밀 계산 아님).</span>`
         +`</div>`;
     } else {
       depWarnEl.innerHTML = `<div class="ok-box" style="margin-top:8px">✓ 85세까지 과세제외 원금이 소진되지 않아요.</div>`;
@@ -1062,7 +1145,7 @@ function renderTable(rows, isaCycle, curAge, npsAge){
     </tr></thead><tbody>`;
   
   rows.forEach(r=>{
-    const isISAYear=r.y%isaCycle===0;
+    const isISAYear=r.isaTransfer>0; // 실제 이체가 발생한 해만 표시 (사이클 나머지 계산 아님)
     const isNPS=r.age===npsAge;
     const note=[];
     if(r.y===1)note.push(`일반${fmtM(r.gEarnY)}+ISA${fmtM(r.iEarnY)}+연금${fmtM(r.totalPEarn)}(예상)+실배당${fmtM(r.actualDivAll)}`);
@@ -1071,6 +1154,7 @@ function renderTable(rows, isaCycle, curAge, npsAge){
     if(r.age===gv('p_age'))note.push('연금 개시 연령');
     if(r.severanceAddY>0)note.push(`퇴직금 +${fmtM(r.severanceAddY)}`);
     if(r.isDepletion)note.push('⚠️ 과세제외 원금 소진');
+    if(r.bridgeFailY>0)note.push(`🛑 브리지 실패 -${fmtM(r.bridgeFailY)}`);
     const surpColor=r.surplusY>=0?'var(--grn)':'var(--red)';
     const gDistTitle = r.y===1 ? `실제 수령 ${fmtM(r.actualDivG)}원 + 남은 기간 예상 ${fmtM(r.projDivG)}원` : '';
     const totalEarnTitle = r.y===1 ? `[예상] 일반 ${fmtM(r.gEarnY)} + ISA ${fmtM(r.iEarnY)} + 연금 ${fmtM(r.totalPEarn)}${r.pWdY>0?' (생활비 인출 '+fmtM(r.pWdY)+' 반영)':''} = 예상소계 ${fmtM(r.projTotalEarnY)}\n[실제] 전계좌 배당 ${fmtM(r.actualDivAll)}\n[합계] ${fmtM(r.totalEarnY)}` : '';
@@ -1318,8 +1402,8 @@ function syncFromFocusFlow(){
     + '<br>연금 수익분(수익분 잔액)은 현재가 정보가 없어 수동 입력을 유지해요';
 }
 
-const SIM_INPUTS=['cur_age','retire_date','pre_save','severance','g_p','g_yield','g_nav','g_fin_inc','i_cur','i_contrib','i_cc_pct','i_cc_yield','i_act_ret','i_cycle','isa_once','p_excl','p_gain','p_cc_pct','p_cc_yield','p_act_ret','p_age','p_tax','extra_m','extra_yrs','exp','inf_rate','nps','nps_age','house','car','car_yr','exp_food','exp_mgmt','exp_loan','exp_tel','exp_car','exp_leisure','exp_med','exp_etc'];
-const SIM_CHECKBOXES=['isa_once']; // 체크박스는 value가 아니라 checked 속성으로 저장/복원해야 함
+const SIM_INPUTS=['cur_age','retire_date','pre_save','severance','g_p','g_yield','g_nav','g_fin_inc','i_cur','i_contrib','i_contrib_post','i_cc_pct','i_cc_yield','i_act_ret','i_cycle','i_mat_date','isa_once','p_excl','p_gain','p_cc_pct','p_cc_yield','p_act_ret','p_age','p_tax','allow_gain_wd','extra_m','extra_yrs','exp','inf_rate','nps','nps_age','house','car','car_yr','exp_food','exp_mgmt','exp_loan','exp_tel','exp_car','exp_leisure','exp_med','exp_etc'];
+const SIM_CHECKBOXES=['isa_once','allow_gain_wd']; // 체크박스는 value가 아니라 checked 속성으로 저장/복원해야 함
 const SIM_KEY='life_sim_v2';
 function saveInputs(){
   const data={};
