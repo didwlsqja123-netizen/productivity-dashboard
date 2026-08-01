@@ -1411,14 +1411,36 @@ async function lcSyncFetchRemotePayload(silent){
 // 가져온 원격 payload를 실제 localStorage에 반영 (이 시점부터 "덮어쓰기"가 발생)
 function lcSyncApplyPayload(payload){
   if (!payload) return false;
-  LC_SYNC_DATA_KEYS.forEach(k => { if (payload[k] !== undefined) localStorage.setItem(k, payload[k]); });
-  if (payload._syncedAt) localStorage.setItem(LC_SYNC_LAST_KEY, payload._syncedAt);
-  return true;
+  const keysToWrite = LC_SYNC_DATA_KEYS.filter(k => payload[k] !== undefined);
+  // 여러 키에 나눠 쓰는 작업이라 중간에 실패하면 "일부만 원격 값으로 바뀐" 혼합 상태가 될 수 있다.
+  // 쓰기 전에 기존 값을 백업해두고, 실패 시 이미 반영된 키들을 원래 값으로 되돌린다.
+  const previous = {};
+  keysToWrite.forEach(k => { previous[k] = localStorage.getItem(k); });
+  const prevLast = localStorage.getItem(LC_SYNC_LAST_KEY);
+  const written = [];
+  try{
+    keysToWrite.forEach(k => {
+      localStorage.setItem(k, payload[k]);
+      written.push(k);
+    });
+    if (payload._syncedAt) localStorage.setItem(LC_SYNC_LAST_KEY, payload._syncedAt);
+    return true;
+  }catch(e){
+    written.forEach(k => {
+      try { previous[k] === null ? localStorage.removeItem(k) : localStorage.setItem(k, previous[k]); }
+      catch(e2){ console.error('lcSyncApplyPayload rollback failed for', k, e2); }
+    });
+    try { prevLast === null ? localStorage.removeItem(LC_SYNC_LAST_KEY) : localStorage.setItem(LC_SYNC_LAST_KEY, prevLast); }
+    catch(e2){ /* 최후 롤백까지 실패하면 더 손쓸 수 없음 */ }
+    lcSyncSetStatus('동기화 데이터를 반영하는 중 저장 공간 문제가 발생해 이전 상태로 되돌렸어요.', 'bad');
+    return false;
+  }
 }
 async function lcSyncDoDownload(silent){
   const payload = await lcSyncFetchRemotePayload(silent);
   if (!payload) return false;
-  lcSyncApplyPayload(payload);
+  const applied = lcSyncApplyPayload(payload);
+  if (!applied) { lcSyncSetBtnState('error'); return false; }
   lcSyncSetBtnState('idle');
   return true;
 }
@@ -1451,8 +1473,9 @@ async function lcSyncAutoDownloadOnLoad(){
     lcSyncSetBtnState('pending');
     return;
   }
-  lcSyncApplyPayload(payload);
-  lcSyncSetBtnState('idle');
+  const applied = lcSyncApplyPayload(payload);
+  lcSyncSetBtnState(applied ? 'idle' : 'error');
+  if (!applied) return;
   try{
     loadInputs();
     if (typeof syncFromFocusFlow === 'function') syncFromFocusFlow();
