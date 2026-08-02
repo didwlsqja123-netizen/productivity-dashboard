@@ -391,7 +391,8 @@ canvas{width:100%;display:block}
     <div class="stg-body">
       <div class="inp-row">
         <div class="inp-box"><div class="inp-lbl">ETF 원금<span class="hint">재테크 탭 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="g_p" type="number" value="25000" readonly style="color:var(--mut2)"/><span class="inp-unit">만원</span></div></div>
-        <div class="inp-box"><div class="inp-lbl">연 배당률<span class="hint">배당내역 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="g_yield" type="number" value="14.4" step=".1" readonly style="color:var(--mut2)"/><span class="inp-unit">%</span></div></div>
+        <div class="inp-box"><div class="inp-lbl">연 배당률<span class="hint">배당내역 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="g_yield" type="number" value="14.4" step=".1" readonly style="color:var(--mut2)"/><span class="inp-unit">%</span></div>
+        <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--mut2);margin-top:5px"><input type="checkbox" id="g_yield_manual" class="sim-inp sim-chk yield-manual"/>직접 입력</label></div>
       </div>
       <div class="auto-row">
         <span class="auto-k">월 분배금 (자동계산)</span>
@@ -422,7 +423,8 @@ canvas{width:100%;display:block}
         <div class="ratio-hdr" style="color:var(--acc)">커버드콜 ETF</div>
         <div class="inp-row" style="margin-top:8px">
           <div class="inp-box"><div class="inp-lbl">비율</div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cc_pct" type="number" value="70" min="0" max="100"/><span class="inp-unit">%</span></div></div>
-          <div class="inp-box"><div class="inp-lbl">연 배당률<span class="hint">배당내역 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cc_yield" type="number" value="14.4" step=".1" readonly style="color:var(--mut2)"/><span class="inp-unit">%</span></div></div>
+          <div class="inp-box"><div class="inp-lbl">연 배당률<span class="hint">배당내역 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cc_yield" type="number" value="14.4" step=".1" readonly style="color:var(--mut2)"/><span class="inp-unit">%</span></div>
+          <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--mut2);margin-top:5px"><input type="checkbox" id="i_cc_yield_manual" class="sim-inp sim-chk yield-manual"/>직접 입력</label></div>
         </div>
       </div>
       <div class="ratio-card">
@@ -466,7 +468,8 @@ canvas{width:100%;display:block}
         <div class="ratio-hdr" style="color:var(--acc)">커버드콜 ETF</div>
         <div class="inp-row" style="margin-top:8px">
           <div class="inp-box"><div class="inp-lbl">비율</div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_cc_pct" type="number" value="70" min="0" max="100"/><span class="inp-unit">%</span></div></div>
-          <div class="inp-box"><div class="inp-lbl">연 배당률<span class="hint">배당내역 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_cc_yield" type="number" value="14.4" step=".1" readonly style="color:var(--mut2)"/><span class="inp-unit">%</span></div></div>
+          <div class="inp-box"><div class="inp-lbl">연 배당률<span class="hint">배당내역 연동 · 자동</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="p_cc_yield" type="number" value="14.4" step=".1" readonly style="color:var(--mut2)"/><span class="inp-unit">%</span></div>
+          <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--mut2);margin-top:5px"><input type="checkbox" id="p_cc_yield_manual" class="sim-inp sim-chk yield-manual"/>직접 입력</label></div>
         </div>
       </div>
       <div class="ratio-card">
@@ -776,6 +779,27 @@ function updateExpSum(){
     if(expEl){expEl.value=sum;expEl.dispatchEvent(new Event('input'));}
   }
 }
+
+function applyYieldInputModes(){
+  [
+    ['g_yield','g_yield_manual'],
+    ['i_cc_yield','i_cc_yield_manual'],
+    ['p_cc_yield','p_cc_yield_manual'],
+  ].forEach(([yieldId,modeId])=>{
+    const input=document.getElementById(yieldId);
+    const mode=document.getElementById(modeId);
+    if(!input||!mode) return;
+    input.readOnly=!mode.checked;
+    input.style.color=mode.checked?'var(--txt)':'var(--mut2)';
+  });
+}
+document.querySelectorAll('.yield-manual').forEach(el=>{
+  el.addEventListener('change', ()=>{
+    applyYieldInputModes();
+    if(el.checked) runSim();
+    else if(typeof syncFromFocusFlow==='function') syncFromFocusFlow();
+  });
+});
 
 function runSim(){
   const now = new Date();
@@ -1439,13 +1463,13 @@ function syncFromFocusFlow(){
   setAndFire('g_p', gP);
   setAndFire('i_cur', iCur);
   setAndFire('p_excl', pExcl);
-  if (gP > 0 && gYield !== null) {
+  if (gP > 0 && gYield !== null && !gvChecked('g_yield_manual')) {
     setAndFire('g_yield', Math.round(gYield*10)/10);
   }
-  if (iCur > 0 && iYield !== null) {
+  if (iCur > 0 && iYield !== null && !gvChecked('i_cc_yield_manual')) {
     setAndFire('i_cc_yield', Math.round(iYield*10)/10);
   }
-  if (pExcl > 0 && pYield !== null) {
+  if (pExcl > 0 && pYield !== null && !gvChecked('p_cc_yield_manual')) {
     setAndFire('p_cc_yield', Math.round(pYield*10)/10);
   }
 
@@ -1459,8 +1483,8 @@ function syncFromFocusFlow(){
     + '<br>연금 수익분(수익분 잔액)은 현재가 정보가 없어 수동 입력을 유지해요';
 }
 
-const SIM_INPUTS=['retire_date','pre_save','severance','g_p','g_yield','g_nav','g_fin_inc','i_cur','i_contrib','i_contrib_post','i_cc_pct','i_cc_yield','i_act_ret','i_cycle','i_mat_date','isa_once','p_excl','p_gain','p_cc_pct','p_cc_yield','p_act_ret','p_age','p_tax','allow_gain_wd','extra_m','extra_yrs','exp','inf_rate','nps','nps_age','house','car','car_yr','exp_food','exp_mgmt','exp_loan','exp_tel','exp_car','exp_leisure','exp_med','exp_etc'];
-const SIM_CHECKBOXES=['isa_once','allow_gain_wd']; // 체크박스는 value가 아니라 checked 속성으로 저장/복원해야 함
+const SIM_INPUTS=['retire_date','pre_save','severance','g_p','g_yield','g_nav','g_fin_inc','i_cur','i_contrib','i_contrib_post','i_cc_pct','i_cc_yield','i_act_ret','i_cycle','i_mat_date','isa_once','p_excl','p_gain','p_cc_pct','p_cc_yield','p_act_ret','p_age','p_tax','allow_gain_wd','extra_m','extra_yrs','exp','inf_rate','nps','nps_age','house','car','car_yr','exp_food','exp_mgmt','exp_loan','exp_tel','exp_car','exp_leisure','exp_med','exp_etc','g_yield_manual','i_cc_yield_manual','p_cc_yield_manual'];
+const SIM_CHECKBOXES=['isa_once','allow_gain_wd','g_yield_manual','i_cc_yield_manual','p_cc_yield_manual']; // 체크박스는 value가 아니라 checked 속성으로 저장/복원해야 함
 const SIM_KEY='life_sim_v2';
 function saveInputs(){
   const data={};
@@ -1486,6 +1510,7 @@ function loadInputs(){
   }catch(e){}
 }
 loadInputs();
+applyYieldInputModes();
 syncFromFocusFlow();
 runSim();
 
@@ -1717,6 +1742,7 @@ async function lcSyncAutoDownloadOnLoad(){
   if (!applied) return;
   try{
     loadInputs();
+    if (typeof applyYieldInputModes === 'function') applyYieldInputModes();
     if (typeof syncFromFocusFlow === 'function') syncFromFocusFlow();
     runSim();
     if (typeof render === 'function') render();
