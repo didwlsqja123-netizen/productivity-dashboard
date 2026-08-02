@@ -447,6 +447,9 @@ canvas{width:100%;display:block}
         <div class="inp-box"><div class="inp-lbl">다음 만기일<span class="hint">비워두면 오늘+사이클로 가정</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_mat_date_jb" type="date"/></div></div>
         <div class="inp-box"><div class="inp-lbl">재가입 사이클<span class="hint">1회성 아닐 때만 사용</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cycle_jb" type="number" value="3" min="3" max="5"/><span class="inp-unit">년</span></div></div>
       </div>
+      <div class="inp-row">
+        <div class="inp-box" style="grid-column:1/-1"><div class="inp-lbl">납입 종료월<span class="hint">비워두면 85세까지 계속 납입</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_contrib_end_jb" type="month"/></div></div>
+      </div>
       <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-family:'Noto Serif KR',serif;font-size:11px;color:var(--mut2);cursor:pointer">
         <input type="checkbox" id="isa_once_jb" class="sim-inp sim-chk" style="accent-color:var(--grn)"/>
         만기 후 반복 안 함 (1회만 연금저축으로 이전)
@@ -468,6 +471,9 @@ canvas{width:100%;display:block}
       <div class="inp-row">
         <div class="inp-box"><div class="inp-lbl">다음 만기일<span class="hint">비워두면 오늘+사이클로 가정</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_mat_date_sy" type="date"/></div></div>
         <div class="inp-box"><div class="inp-lbl">재가입 사이클<span class="hint">1회성 아닐 때만 사용</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_cycle_sy" type="number" value="3" min="3" max="5"/><span class="inp-unit">년</span></div></div>
+      </div>
+      <div class="inp-row">
+        <div class="inp-box" style="grid-column:1/-1"><div class="inp-lbl">납입 종료월<span class="hint">비워두면 85세까지 계속 납입</span></div><div class="inp-wrap"><input class="inp-num sim-inp" id="i_contrib_end_sy" type="month"/></div></div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-family:'Noto Serif KR',serif;font-size:11px;color:var(--mut2);cursor:pointer">
         <input type="checkbox" id="isa_once_sy" class="sim-inp sim-chk" style="accent-color:var(--grn)"/>
@@ -857,6 +863,16 @@ function runSim(){
     if (rd <= segStart) return frac;
     return Math.max(0, Math.round((segEnd-rd)/86400000)/daysInPeriod);
   }
+  // ISA 납입 종료월: 설정돼 있으면 그 시점부터는 (퇴직 전/후 구분 없이) 납입을 완전히 멈춘다.
+  // endDate가 구간 중간에 걸리면, 그 구간에서 "종료월 이전" 몫만 활성(activeFrac)으로 본다.
+  function activeFracBefore(endDate, segStart, segEnd, frac, daysInPeriod){
+    if (!endDate) return frac;
+    if (endDate <= segStart) return 0;
+    if (endDate >= segEnd) return frac;
+    return Math.max(0, Math.round((endDate-segStart)/86400000)/daysInPeriod);
+  }
+  const iContribEndJB = parseMonthDate('i_contrib_end_jb');
+  const iContribEndSY = parseMonthDate('i_contrib_end_sy');
   const preSave = gv('pre_save');
   const severance = gv('severance');
   const gP=gv('g_p'), gYield=gv('g_yield')/100, gNav=gv('g_nav')/100, gFinInc=gv('g_fin_inc');
@@ -910,9 +926,13 @@ function runSim(){
       const wFracJB = Math.max(0, frac-rFracJB);
       const rFracSY = retiredFracFor(rawRetireSY, cursor, segEnd, frac, daysInYear);
       const wFracSY = Math.max(0, frac-rFracSY);
+      const activeJB = activeFracBefore(iContribEndJB, cursor, segEnd, frac, daysInYear);
+      const scaleJB = frac>0 ? activeJB/frac : 0;
+      const activeSY = activeFracBefore(iContribEndSY, cursor, segEnd, frac, daysInYear);
+      const scaleSY = frac>0 ? activeSY/frac : 0;
       sG = sG*(1+gYield*frac)*Math.pow(1+gNav,frac) + preSave*12*wFracHH;
-      sIJB = sIJB*Math.pow(1+iRet,frac) + iContribJB*wFracJB + iContribPostJB*rFracJB;
-      sISY = sISY*Math.pow(1+iRet,frac) + iContribSY*wFracSY + iContribPostSY*rFracSY;
+      sIJB = sIJB*Math.pow(1+iRet,frac) + (iContribJB*wFracJB + iContribPostJB*rFracJB)*scaleJB;
+      sISY = sISY*Math.pow(1+iRet,frac) + (iContribSY*wFracSY + iContribPostSY*rFracSY)*scaleSY;
       sPG = sPG + (sPE+sPG)*(Math.pow(1+pRet,frac)-1);
       cursor = new Date(cursor.getFullYear()+1,0,1);
     }
@@ -937,7 +957,7 @@ function runSim(){
 
   // ISA 만기 예상 전환액 — 실제 만기일까지 달력 기준으로 부분연도/온전연도를 나눠 투영. 진범/소연 각자 계산.
   // 만기일 전에 퇴직일이 끼어 있으면, 그 구간부터는 퇴직 후 납입액(iContribPost)으로 전환해 계산.
-  function projectIsaTransfer(curBal, contrib, contribPost, matDate, personRetireDate){
+  function projectIsaTransfer(curBal, contrib, contribPost, matDate, personRetireDate, contribEndDate){
     let bal = curBal;
     let cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     while (cursor < matDate) {
@@ -948,7 +968,9 @@ function runSim(){
       const frac = Math.min(1, segDays/daysInYear);
       const retiredFrac = retiredFracFor(personRetireDate, cursor, segEnd, frac, daysInYear);
       const workingFrac = Math.max(0, frac-retiredFrac);
-      bal = bal*(1+iRet*frac) + contrib*workingFrac + contribPost*retiredFrac;
+      const activeFrac = activeFracBefore(contribEndDate, cursor, segEnd, frac, daysInYear);
+      const scale = frac>0 ? activeFrac/frac : 0;
+      bal = bal*(1+iRet*frac) + (contrib*workingFrac + contribPost*retiredFrac)*scale;
       cursor = new Date(cursor.getFullYear()+1, 0, 1);
     }
     return bal;
@@ -958,8 +980,8 @@ function runSim(){
     const el=document.getElementById(elId);
     if(el)el.textContent=fmtW(Math.round(previewVal))+'원 ('+matDate.getFullYear()+'.'+(matDate.getMonth()+1)+'.'+matDate.getDate()+', 약 '+matYears+'년 후)';
   }
-  const isaTransferPreviewJB = projectIsaTransfer(iCurJB, iContribJB, iContribPostJB, iMatDateJB, rawRetireJB);
-  const isaTransferPreviewSY = projectIsaTransfer(iCurSY, iContribSY, iContribPostSY, iMatDateSY, rawRetireSY);
+  const isaTransferPreviewJB = projectIsaTransfer(iCurJB, iContribJB, iContribPostJB, iMatDateJB, rawRetireJB, iContribEndJB);
+  const isaTransferPreviewSY = projectIsaTransfer(iCurSY, iContribSY, iContribPostSY, iMatDateSY, rawRetireSY, iContribEndSY);
   displayIsaTransferPreview('i_transfer_display_jb', iMatDateJB, isaTransferPreviewJB);
   displayIsaTransferPreview('i_transfer_display_sy', iMatDateSY, isaTransferPreviewSY);
 
@@ -1117,8 +1139,12 @@ function runSim(){
     if(surplusSeg>=0) reinvestSeg=surplusSeg; else pWdSeg=Math.abs(surplusSeg);
 
     const gEarnSeg=aG*gYield*frac + aG*gNavGeo;
-    const iContribSegJB = iContribJB*workingFracJB + iContribPostJB*retiredFracJB;
-    const iContribSegSY = iContribSY*workingFracSY + iContribPostSY*retiredFracSY;
+    const activeFracJB = activeFracBefore(iContribEndJB, segStart, segEnd, frac, daysInRowYear);
+    const contribScaleJB = frac>0 ? activeFracJB/frac : 0;
+    const activeFracSY = activeFracBefore(iContribEndSY, segStart, segEnd, frac, daysInRowYear);
+    const contribScaleSY = frac>0 ? activeFracSY/frac : 0;
+    const iContribSegJB = (iContribJB*workingFracJB + iContribPostJB*retiredFracJB)*contribScaleJB;
+    const iContribSegSY = (iContribSY*workingFracSY + iContribPostSY*retiredFracSY)*contribScaleSY;
     const iEarnSegJB = growIsa(isaJB, iRetGeo, iContribSegJB);
     const iEarnSegSY = growIsa(isaSY, iRetGeo, iContribSegSY);
     const iEarnSeg = iEarnSegJB + iEarnSegSY;
@@ -1617,7 +1643,7 @@ function syncFromFocusFlow(){
     + '<br>연금 수익분(수익분 잔액)은 현재가 정보가 없어 수동 입력을 유지해요';
 }
 
-const SIM_INPUTS=['retire_date_jb','retire_date_sy','pre_save','severance','g_p','g_yield','g_nav','g_fin_inc','i_cur_jb','i_contrib_jb','i_contrib_post_jb','i_cycle_jb','i_mat_date_jb','i_cur_sy','i_contrib_sy','i_contrib_post_sy','i_cycle_sy','i_mat_date_sy','i_cc_pct','i_cc_yield','i_act_ret','p_excl','p_gain','p_cc_pct','p_cc_yield','p_act_ret','p_age','p_tax','allow_gain_wd','extra_m','extra_yrs','exp','exp_cap','inf_rate','nps','nps_age','house','car','car_yr','exp_food','exp_mgmt','exp_loan','exp_tel','exp_car','exp_leisure','exp_med','exp_etc','g_yield_manual','i_cc_yield_manual','p_cc_yield_manual'];
+const SIM_INPUTS=['retire_date_jb','retire_date_sy','pre_save','severance','g_p','g_yield','g_nav','g_fin_inc','i_cur_jb','i_contrib_jb','i_contrib_post_jb','i_cycle_jb','i_mat_date_jb','i_contrib_end_jb','i_cur_sy','i_contrib_sy','i_contrib_post_sy','i_cycle_sy','i_mat_date_sy','i_contrib_end_sy','i_cc_pct','i_cc_yield','i_act_ret','p_excl','p_gain','p_cc_pct','p_cc_yield','p_act_ret','p_age','p_tax','allow_gain_wd','extra_m','extra_yrs','exp','exp_cap','inf_rate','nps','nps_age','house','car','car_yr','exp_food','exp_mgmt','exp_loan','exp_tel','exp_car','exp_leisure','exp_med','exp_etc','g_yield_manual','i_cc_yield_manual','p_cc_yield_manual'];
 const SIM_CHECKBOXES=['isa_once_jb','isa_once_sy','allow_gain_wd','g_yield_manual','i_cc_yield_manual','p_cc_yield_manual']; // 체크박스는 value가 아니라 checked 속성으로 저장/복원해야 함
 const SIM_KEY='life_sim_v2';
 function saveInputs(){
