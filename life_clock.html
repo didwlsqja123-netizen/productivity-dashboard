@@ -1142,8 +1142,9 @@ function runSim(){
     // 이 달 안에 ISA 만기일이 걸리면 만기 시점 전/후로 쪼개서 계산 (경계값 포함)
     let segResult;
     if (!isaMatured && nextIsaMatDate && nextIsaMatDate >= monthStart && nextIsaMatDate <= monthEnd) {
-      const r1 = runSegment(monthStart, nextIsaMatDate, daysInThisCalYear, y, age, rowYear);
-      const r2 = runSegment(nextIsaMatDate, monthEnd, daysInThisCalYear, y, age, rowYear);
+      const matDate = nextIsaMatDate; // r1 실행 중 nextIsaMatDate가 갱신되므로, r2용으로 미리 스냅샷을 떠둔다
+      const r1 = runSegment(monthStart, matDate, daysInThisCalYear, y, age, rowYear);
+      const r2 = runSegment(matDate, monthEnd, daysInThisCalYear, y, age, rowYear);
       segResult = {
         gEarnY: r1.gEarnY+r2.gEarnY, iEarnY: r1.iEarnY+r2.iEarnY, totalPEarn: r1.totalPEarn+r2.totalPEarn,
         totalEarnY: r1.totalEarnY+r2.totalEarnY, expY: r1.expY+r2.expY, surplusY: r1.surplusY+r2.surplusY,
