@@ -1236,7 +1236,7 @@ const LS = {
   ledger: 'ff_ledger', dividends: 'ff_dividends', dividendGoal: 'ff_dividend_goal',
   ledgerCustomCats: 'ff_ledger_custom_cats', ledgerRecurring: 'ff_ledger_recurring',
   ledgerRecurringApplied: 'ff_ledger_recurring_applied', investments: 'ff_investments',
-  investStocks: 'ff_invest_stocks'
+  investStocks: 'ff_invest_stocks', quickDivBrokers: 'ff_quick_div_brokers'
 };
 let _lastSaveErrorToastAt = 0;
 function showSaveErrorToast(msg) {
@@ -1308,7 +1308,7 @@ function load(key, def) { try { const v=localStorage.getItem(key); return v?JSON
 // ── GITHUB 동기화 모듈 (자동) ──
 // 동기화 대상 데이터 키 (실제 콘텐츠 데이터만, 인증정보는 별도 저장)
 // ════════════════════════════════════════════════════════════
-const SYNC_DATA_KEYS = ['ff_tasks','ff_goals','ff_projects','ff_habits','ff_notes','ff_week','ff_memo','ff_manual_location','ff_ledger','ff_dividends','ff_dividend_goal','ff_ledger_custom_cats','ff_ledger_recurring','ff_ledger_recurring_applied','ff_investments','ff_invest_stocks'];
+const SYNC_DATA_KEYS = ['ff_tasks','ff_goals','ff_projects','ff_habits','ff_notes','ff_week','ff_memo','ff_manual_location','ff_ledger','ff_dividends','ff_dividend_goal','ff_ledger_custom_cats','ff_ledger_recurring','ff_ledger_recurring_applied','ff_investments','ff_invest_stocks','ff_quick_div_brokers'];
 const SYNC_CFG_KEY = 'ff_sync_cfg'; // {token, owner, repo} — 이 기기에만 저장됨
 const SYNC_FILE_PATH = 'focusflow-data.json';
 const SYNC_DEBOUNCE_MS = 2500; // 마지막 수정 후 이 시간만큼 조작이 없으면 자동 업로드
@@ -1587,6 +1587,7 @@ function renderAllAfterSync() {
     memoText = load(LS.memo, memoText);
     ledgerEntries = load(LS.ledger, ledgerEntries);
     dividendEntries = load(LS.dividends, dividendEntries);
+    quickDivBrokers = load(LS.quickDivBrokers, quickDivBrokers);
     ledgerCustomCategories = load(LS.ledgerCustomCats, ledgerCustomCategories);
     ledgerRecurring = load(LS.ledgerRecurring, ledgerRecurring);
     investments = load(LS.investments, investments);
@@ -1751,6 +1752,45 @@ function dividendPrevMonthKey(mk) { return ledgerPrevMonthKey(mk); }
 function dividendNextMonthKey(mk) { return ledgerNextMonthKey(mk); }
 function dividendMonthLabel(mk) { return ledgerMonthLabel(mk); }
 function dividendYearKey(mk) { return mk.slice(0,4); }
+
+// ── ⚡ 간편 입력 그리드의 증권사 목록 (사람별로 다를 수 있음, 언제든 추가/이름변경/삭제 가능) ──
+let quickDivBrokers = load(LS.quickDivBrokers, { '진범': ['키움','나무','신한','토스'], '소연': ['키움','나무','신한','토스'] });
+function quickDivBrokersFor(person) {
+  if (!quickDivBrokers[person]) quickDivBrokers[person] = ['키움','나무','신한','토스'];
+  return quickDivBrokers[person];
+}
+function quickDivAddBroker(person) {
+  const name = (prompt(person+'에 추가할 증권사 이름을 입력하세요')||'').trim();
+  if (!name) return;
+  const list = quickDivBrokersFor(person);
+  if (list.includes(name)) { alert('이미 있는 증권사예요'); return; }
+  list.push(name);
+  save(LS.quickDivBrokers, quickDivBrokers);
+  if (currentTab==='dividend') renderTab('dividend');
+}
+function quickDivRenameBroker(person, oldName) {
+  const name = (prompt('증권사 이름 수정', oldName)||'').trim();
+  if (!name || name===oldName) return;
+  const list = quickDivBrokersFor(person);
+  const idx = list.indexOf(oldName);
+  if (idx>-1) list[idx] = name;
+  // 이미 기록된 배당 내역도 새 이름으로 따라가도록 broker/stock 필드를 갱신
+  dividendEntries.forEach(function(d){
+    if (d.person===person && d.broker===oldName) { d.broker=name; if (d.stock===oldName) d.stock=name; }
+  });
+  save(LS.quickDivBrokers, quickDivBrokers);
+  save(LS.dividends, dividendEntries);
+  if (currentTab==='dividend') renderTab('dividend');
+}
+function quickDivRemoveBroker(person, name) {
+  const hasData = dividendEntries.some(function(d){ return d.person===person && d.broker===name && d.amount>0; });
+  if (hasData && !confirm('"'+name+'"에 입력된 배당 기록이 있어요. 증권사 목록에서만 지우고 기록은 그대로 둘까요?')) return;
+  const list = quickDivBrokersFor(person);
+  const idx = list.indexOf(name);
+  if (idx>-1) list.splice(idx,1);
+  save(LS.quickDivBrokers, quickDivBrokers);
+  if (currentTab==='dividend') renderTab('dividend');
+}
 
 // ── 목표 월 배당 ──
 let dividendGoal = load(LS.dividendGoal, 0); // 0이면 미설정
@@ -3324,21 +3364,24 @@ function tabHTML(tab) {
     const monthEntries = dividendEntries.filter(d=>d.month===mk);
     const totalThisMonth = monthEntries.reduce((s,d)=>s+d.amount,0);
 
-    const QUICK_BROKERS = ['키움','나무','신한','토스'];
     const QUICK_TYPES = ['일반계좌','ISA','연금저축'];
     function quickDivGrid(person) {
+      const brokers = quickDivBrokersFor(person);
       const cellVal = function(broker, at) {
         const e = dividendEntries.find(function(d){ return d.month===mk && d.person===person && d.broker===broker && (d.acctType||'일반계좌')===at; });
         return e ? e.amount : '';
       };
-      const personSubtotal = QUICK_BROKERS.reduce(function(s,b){ return s + QUICK_TYPES.reduce(function(s2,t){ const v=cellVal(b,t); return s2 + (v===''?0:v); },0); },0);
-      const headerHtml = '<div style="display:grid;grid-template-columns:44px repeat(3,1fr);gap:4px;margin-bottom:5px">'
+      const personSubtotal = brokers.reduce(function(s,b){ return s + QUICK_TYPES.reduce(function(s2,t){ const v=cellVal(b,t); return s2 + (v===''?0:v); },0); },0);
+      const headerHtml = '<div style="display:grid;grid-template-columns:60px repeat(3,1fr);gap:4px;margin-bottom:5px">'
         + '<div></div>'
         + QUICK_TYPES.map(function(t){ return '<div style="font-size:9px;color:var(--text3);text-align:center">'+t.replace('계좌','').replace('저축','')+'</div>'; }).join('')
         + '</div>';
-      const rowsHtml = QUICK_BROKERS.map(function(b){
-        return '<div style="display:grid;grid-template-columns:44px repeat(3,1fr);gap:4px;margin-bottom:5px;align-items:center">'
-          + '<div style="font-size:11px;color:var(--text2)">'+b+'</div>'
+      const rowsHtml = brokers.map(function(b){
+        return '<div style="display:grid;grid-template-columns:60px repeat(3,1fr);gap:4px;margin-bottom:5px;align-items:center">'
+          + '<div style="display:flex;align-items:center;gap:2px;min-width:0">'
+          + '<span onclick="quickDivRenameBroker(\''+person+'\',\''+b+'\')" style="font-size:11px;color:var(--text2);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="탭해서 이름 수정">'+b+'</span>'
+          + '<span onclick="quickDivRemoveBroker(\''+person+'\',\''+b+'\')" style="font-size:10px;color:var(--text3);cursor:pointer;flex-shrink:0;padding:0 2px" title="목록에서 삭제">×</span>'
+          + '</div>'
           + QUICK_TYPES.map(function(t){
               const v = cellVal(b,t);
               return '<input type="number" placeholder="0" value="'+v+'" '
@@ -3353,6 +3396,7 @@ function tabHTML(tab) {
         + '<div style="font-size:12px;color:var(--text2)">'+personSubtotal.toLocaleString()+'원</div>'
         + '</div>'
         + headerHtml + rowsHtml
+        + '<div onclick="quickDivAddBroker(\''+person+'\')" style="font-size:11px;color:var(--accent2);cursor:pointer;margin-top:4px;padding:4px 0">+ 증권사 추가</div>'
         + '</div>';
     }
 
@@ -3422,7 +3466,7 @@ function tabHTML(tab) {
         <div class="dividend-person-row" style="display:flex;gap:10px;flex-wrap:wrap">
           ${DIV_PEOPLE.map(p=>quickDivGrid(p)).join('')}
         </div>
-        <div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5">칸에 이번 달 받은 배당금액만 입력하면 자동 저장돼요. 언제든 값을 고쳐 덮어쓸 수 있어요. ISA는 ISA끼리, 연금저축은 연금저축끼리 합산돼서 아래 통계·재테크 연동에 그대로 반영돼요.</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5">칸에 이번 달 받은 배당금액만 입력하면 자동 저장돼요. 언제든 값을 고쳐 덮어쓸 수 있어요. 증권사 이름을 탭하면 수정, ×를 누르면 목록에서 제거, "+ 증권사 추가"로 새로 추가할 수 있어요(진범·소연 각자 다르게 설정 가능). ISA는 ISA끼리, 연금저축은 연금저축끼리 합산돼서 아래 통계·재테크 연동에 그대로 반영돼요.</div>
       </div>
       <div style="margin-bottom:18px">
         <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">${yk}년 월별 배당 추이</div>
