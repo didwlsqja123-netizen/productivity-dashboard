@@ -1313,9 +1313,10 @@ const SYNC_CFG_KEY = 'ff_sync_cfg'; // {token, owner, repo} — 이 기기에만
 const SYNC_FILE_PATH = 'focusflow-data.json';
 const SYNC_DEBOUNCE_MS = 2500; // 마지막 수정 후 이 시간만큼 조작이 없으면 자동 업로드
 const SYNC_LAST_KEY = 'ff_sync_last'; // 마지막 동기화 시각 표시용 (기기별)
+const SYNC_PENDING_KEY = 'ff_sync_pending'; // 업로드 안 된 로컬 변경이 있는지 — 새로고침해도 남아있어야 하므로 localStorage에 기록
 let _syncDebounceTimer = null;
 let _syncInFlight = false;
-let _syncPendingLocalChange = false; // 다운로드보다 먼저 처리해야 할 로컬 변경이 있는지
+let _syncPendingLocalChange = false; // 다운로드보다 먼저 처리해야 할 로컬 변경이 있는지 (메모리상 값 — 새로고침되면 초기화됨)
 
 function syncGetCfg() {
   try { return JSON.parse(localStorage.getItem(SYNC_CFG_KEY) || '{}'); } catch(e) { return {}; }
@@ -1454,6 +1455,7 @@ async function syncDoUpload(silent) {
     }
     localStorage.setItem(SYNC_LAST_KEY, payload._syncedAt);
     _syncPendingLocalChange = false;
+    try { localStorage.removeItem(SYNC_PENDING_KEY); } catch(e) { /* 무시 — 다음 성공 업로드 때 다시 지워짐 */ }
     if (!silent) syncSetStatus('✓ 업로드 완료! ' + new Date().toLocaleTimeString('ko-KR'), 'ok');
     syncSetBtnState('idle');
     return true;
@@ -1558,6 +1560,18 @@ async function syncDownload() {
 async function syncAutoDownloadOnLoad() {
   if (!syncIsConfigured()) { syncSetBtnState('idle'); return; }
   syncSetBtnState('syncing');
+  // 지난 세션에서 업로드가 끝나기 전에 새로고침/종료됐다면, 메모리 플래그(_syncPendingLocalChange)는
+  // 새로고침으로 초기화돼도 localStorage의 이 표시는 남아있다. 원격 데이터로 이 기기를 덮어쓰기 전에
+  // 먼저 그 남은 변경을 업로드해서 지킨다 — 이걸 안 하면 방금 입력한 값이 예전 원격 데이터로 덮어써질 수 있다.
+  if (localStorage.getItem(SYNC_PENDING_KEY) === '1') {
+    _syncPendingLocalChange = true;
+    const uploaded = await syncDoUpload(true);
+    if (!uploaded) {
+      // 업로드도 실패하면(오프라인 등) 이번엔 자동 다운로드를 아예 건너뛴다 — 안전한 쪽으로.
+      syncSetBtnState('error');
+      return;
+    }
+  }
   const hadLocalChangeBefore = _syncPendingLocalChange;
   const payload = await syncFetchRemotePayload(true);
   if (!payload) { syncSetBtnState('idle'); return; }
@@ -1603,6 +1617,7 @@ function renderAllAfterSync() {
 function syncScheduleAutoUpload() {
   if (!syncIsConfigured()) return;
   _syncPendingLocalChange = true;
+  try { localStorage.setItem(SYNC_PENDING_KEY, '1'); } catch(e) { /* 저장 실패해도 메모리 플래그로는 이번 세션 내 보호는 유지됨 */ }
   syncSetBtnState('pending');
   if (_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
   _syncDebounceTimer = setTimeout(() => {
