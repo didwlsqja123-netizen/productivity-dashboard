@@ -2663,6 +2663,23 @@ function deleteDividendEntry(id) {
   const i = dividendEntries.findIndex(d=>d.id===id);
   if (i>-1) { dividendEntries.splice(i,1); save(LS.dividends, dividendEntries); if (currentTab==='dividend') renderTab('dividend'); }
 }
+// ⚡ 간편 입력 그리드(증권사×계좌구분) 저장 — 기존 dividendEntries를 그대로 재사용해서
+// getActualDivYTD/월합계/연합계/재테크 연동 등 기존 집계 로직이 자동으로 그대로 반영됨.
+// stock 필드에는 증권사명을 넣어 목록에도 자연스럽게 표시되고, broker 필드로 같은 칸을 다시 찾아 덮어쓸 수 있음.
+function quickDivSave(person, broker, acctType, valStr) {
+  const amount = Math.round(Number(String(valStr).replace(/,/g,''))||0);
+  const mk = dividendViewMonth;
+  const idx = dividendEntries.findIndex(function(d){ return d.month===mk && d.person===person && d.broker===broker && (d.acctType||'일반계좌')===acctType; });
+  if (amount <= 0) {
+    if (idx > -1) dividendEntries.splice(idx,1); // 0으로 지우면 그 칸 기록 삭제
+  } else if (idx > -1) {
+    dividendEntries[idx].amount = amount;
+  } else {
+    dividendEntries.push({ id: Date.now()+Math.random(), month: mk, person: person, stock: broker, acctType: acctType, shares: 0, amount: amount, broker: broker });
+  }
+  save(LS.dividends, dividendEntries);
+  if (currentTab==='dividend') renderTab('dividend');
+}
 function dividendChangeMonth(dir) {
   dividendViewMonth = dir > 0 ? dividendNextMonthKey(dividendViewMonth) : dividendPrevMonthKey(dividendViewMonth);
   if (currentTab === 'dividend') renderTab('dividend');
@@ -3307,6 +3324,38 @@ function tabHTML(tab) {
     const monthEntries = dividendEntries.filter(d=>d.month===mk);
     const totalThisMonth = monthEntries.reduce((s,d)=>s+d.amount,0);
 
+    const QUICK_BROKERS = ['키움','나무','신한','토스'];
+    const QUICK_TYPES = ['일반계좌','ISA','연금저축'];
+    function quickDivGrid(person) {
+      const cellVal = function(broker, at) {
+        const e = dividendEntries.find(function(d){ return d.month===mk && d.person===person && d.broker===broker && (d.acctType||'일반계좌')===at; });
+        return e ? e.amount : '';
+      };
+      const personSubtotal = QUICK_BROKERS.reduce(function(s,b){ return s + QUICK_TYPES.reduce(function(s2,t){ const v=cellVal(b,t); return s2 + (v===''?0:v); },0); },0);
+      const headerHtml = '<div style="display:grid;grid-template-columns:44px repeat(3,1fr);gap:4px;margin-bottom:5px">'
+        + '<div></div>'
+        + QUICK_TYPES.map(function(t){ return '<div style="font-size:9px;color:var(--text3);text-align:center">'+t.replace('계좌','').replace('저축','')+'</div>'; }).join('')
+        + '</div>';
+      const rowsHtml = QUICK_BROKERS.map(function(b){
+        return '<div style="display:grid;grid-template-columns:44px repeat(3,1fr);gap:4px;margin-bottom:5px;align-items:center">'
+          + '<div style="font-size:11px;color:var(--text2)">'+b+'</div>'
+          + QUICK_TYPES.map(function(t){
+              const v = cellVal(b,t);
+              return '<input type="number" placeholder="0" value="'+v+'" '
+                + 'onchange="quickDivSave(\''+person+'\',\''+b+'\',\''+t+'\',this.value)" '
+                + 'style="width:100%;min-width:0;background:var(--surface);border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:6px 3px;font-size:12px;text-align:right">';
+            }).join('')
+          + '</div>';
+      }).join('');
+      return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;flex:1;min-width:0">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+        + '<div style="font-size:13px;font-weight:600;color:var(--text)">'+person+'</div>'
+        + '<div style="font-size:12px;color:var(--text2)">'+personSubtotal.toLocaleString()+'원</div>'
+        + '</div>'
+        + headerHtml + rowsHtml
+        + '</div>';
+    }
+
     function personBlock(person) {
       const rows = monthEntries.filter(d=>d.person===person).sort((a,b)=>b.amount-a.amount);
       const subtotal = rows.reduce((s,d)=>s+d.amount,0);
@@ -3367,6 +3416,13 @@ function tabHTML(tab) {
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px">
         <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${dividendMonthLabel(mk)} 총 배당</div>
         <div style="font-size:20px;font-weight:600;color:var(--accent)">${totalThisMonth.toLocaleString()}원</div>
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">⚡ 간편 입력 · 증권사별 배당금액 (${dividendMonthLabel(mk)})</div>
+        <div class="dividend-person-row" style="display:flex;gap:10px;flex-wrap:wrap">
+          ${DIV_PEOPLE.map(p=>quickDivGrid(p)).join('')}
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5">칸에 이번 달 받은 배당금액만 입력하면 자동 저장돼요. 언제든 값을 고쳐 덮어쓸 수 있어요. ISA는 ISA끼리, 연금저축은 연금저축끼리 합산돼서 아래 통계·재테크 연동에 그대로 반영돼요.</div>
       </div>
       <div style="margin-bottom:18px">
         <div style="font-size:11px;color:var(--text2);margin-bottom:8px;letter-spacing:0.03em">${yk}년 월별 배당 추이</div>
